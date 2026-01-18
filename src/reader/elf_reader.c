@@ -20,7 +20,9 @@
  * SOFTWARE.
  */
 
-#include "elf_core.h"
+#include "common/elf_core.h"
+#include "common/elf_common.h"
+#include "elf_reader.h"
 
 #define CTX(ctx) ((InternalElfCtx *)(ctx))
 
@@ -40,152 +42,7 @@ typedef struct
         uint16_t SecNameStrIndx; // Index of the entry in the section header table that points to the section names.
 } InternalElfCtx;
 
-//_Static_assert(sizeof(InternalElfCtx) <= ELF_CTX_SIZE, "ELF_CTX_SIZE too small"); gives problems with rust compilation.
-
-typedef struct
-{
-        uint8_t Magic[4];   // 0x7f, E, L, F
-        uint8_t EI_Class;   // 32 or 64 bit architecture
-        uint8_t EI_Data;    // LSB or MSB architecture
-        uint8_t EI_Version; // Always 1
-        uint8_t EI_OS_ABI;       // Target Platform's ABI
-        uint8_t EI_ABI_Version; // Target ABI Version
-        uint8_t Pad[7];
-        uint16_t Type;    // Type of ELF file
-        uint16_t Machine; // Architecture
-        uint32_t Version; // Always 1
-} ElfInfo;
-
-typedef struct
-{
-        ElfInfo;
-        uint32_t Entry;      // Entry point (virtual address)
-        uint32_t ProHeadOff; // Offset of program header table in the file (bytes)
-        uint32_t SecHeadOff; // Offset of section header table in the file (bytes)
-        uint32_t Flags;
-        uint16_t HeadSize;       // This header's size
-        uint16_t PHEntrySize;    // Size of one entry in the program header table
-        uint16_t PHEntryNum;     // Number of entries in the program header table
-        uint16_t SHEntrySize;    // Size of one entry in the section header table
-        uint16_t SHEntryNum;     // Number of entries in the section header table
-        uint16_t SecNameStrIndx; // Index of the entry in the section table that points to the section names.
-} Elf32Header;
-
-typedef struct
-{
-        ElfInfo;
-        uint64_t Entry;      // Entry point (virtual address)
-        uint64_t ProHeadOff; // Offset of program header table in the file
-        uint64_t SecHeadOff; // Offset of section header table in the file
-        uint32_t Flags;
-        uint16_t HeadSize;       // This header's size
-        uint16_t PHEntrySize;    // Size of one entry in the program header table
-        uint16_t PHEntryNum;     // Number of entries in the program header table
-        uint16_t SHEntrySize;    // Size of one entry in the section header table
-        uint16_t SHEntryNum;     // Number of entries in the section header table
-        uint16_t SecNameStrIndx; // Index of the entry in the section table that points to the section names.
-} Elf64Header;
-
-typedef struct
-{
-        uint32_t NameIdx; // Index into the section header string table section
-        uint32_t Type;    // Type of section
-        uint32_t Flags;
-        uint32_t Address; // If the section is in the memory img of a process this is the first address
-        uint32_t Offset;  // Section is stored at <offset> from the begining of this file
-        uint32_t Size;    // Size of the section
-        uint32_t Link;
-        uint32_t Info;
-        uint32_t Alignment; // Alignment constraints of Address field
-        uint32_t EntrySize; // If the section is a table of fixed-size entries this is the entry size
-} Elf32SecHeader;
-
-typedef struct
-{
-        uint32_t NameIdx; // Index into the section header string table section
-        uint32_t Type;    // Type of section
-        uint64_t Flags;
-        uint64_t Address; // If the section is in the memory img of a process this is the first address
-        uint64_t Offset;  // Section is stored at <offset> from the begining of this file
-        uint64_t Size;    // Size of the section
-        uint32_t Link;
-        uint32_t Info;
-        uint64_t Alignment; // Alignment constraints of Address field
-        uint64_t EntrySize; // If the section is a table of fixed-size entries this is the entry size
-} Elf64SecHeader;
-
-typedef struct
-{
-        uint32_t Type; // Type of segment
-        uint32_t Offset;     // Section is stored at <offset> from the begining of this file
-        uint32_t PhyAddress; // Physical address, only relevant on some systems
-        uint32_t VirAddress; // Virtual address of this segment in memory
-        uint32_t FileSize;   // Size of the segment in this file
-        uint32_t MemSize;    // Size of the segment in the memory image
-        uint32_t Flags;      
-        uint32_t Alignment;  // Alignment constraints of Address fields
-} Elf32ProHeader;
-
-typedef struct
-{
-        uint32_t Type; // Type of segment
-        uint32_t Flags;      
-        uint64_t Offset;     // Section is stored at <offset> from the begining of this file
-        uint64_t PhyAddress; // Physical address, only relevant on some systems
-        uint64_t VirAddress; // Virtual address of this segment in memory
-        uint64_t FileSize;   // Size of the segment in this file
-        uint64_t MemSize;    // Size of the segment in the memory image
-        uint64_t Alignment;  // Alignment constraints of Address fields
-} Elf64ProHeader;
-
-typedef struct
-{
-        uint32_t NameIdx;      // Index into the related string table
-        uint32_t Value;        // Value (Address) of the symbol
-        uint32_t Size;         // Size of the object referenced by the symbol
-        uint8_t  info;
-        uint8_t  reserved;
-        uint16_t SecIdx;
-} Elf32SymEntry;
-
-typedef struct
-{
-        uint32_t NameIdx;      // Index into the related string table
-        uint8_t  info;
-        uint8_t  reserved;
-        uint16_t SecIdx;
-        uint64_t Value;        // Value (Address) of the symbol
-        uint64_t Size;         // Size of the object referenced by the symbol
-} Elf64SymEntry;
-
-/** Detect host endianness at runtime */
-static inline EiData host_endianness(void) {
-        uint16_t x = 1;
-        return (*(uint8_t *)&x) ? DATA_LSB : DATA_MSB;
-}
-    
-/** Swap helpers */
-static inline uint16_t swap16(uint16_t v) {
-        return (v >> 8) | (v << 8);
-}
-    
-static inline uint32_t swap32(uint32_t v) {
-        return ((v >> 24) & 0x000000FF) |
-               ((v >> 8)  & 0x0000FF00) |
-               ((v << 8)  & 0x00FF0000) |
-               ((v << 24) & 0xFF000000);
-}
-    
-static inline uint64_t swap64(uint64_t v) {
-        return ((v >> 56) & 0x00000000000000FFULL) |
-               ((v >> 40) & 0x000000000000FF00ULL) |
-               ((v >> 24) & 0x0000000000FF0000ULL) |
-               ((v >> 8)  & 0x00000000FF000000ULL) |
-               ((v << 8)  & 0x000000FF00000000ULL) |
-               ((v << 24) & 0x0000FF0000000000ULL) |
-               ((v << 40) & 0x00FF000000000000ULL) |
-               ((v << 56) & 0xFF00000000000000ULL);
-}
+_Static_assert(sizeof(InternalElfCtx) <= ELF_CTX_SIZE, "ELF_CTX_SIZE too small");
     
 /** Read functions with automatic host-endian detection */
 static inline uint16_t read_16(const uint16_t *data, EiData elf_endianness) {
@@ -212,11 +69,23 @@ static inline uint64_t read_64(const uint64_t *data, EiData elf_endianness) {
         return v;
 }
 
+/** Helper expression to reduce repetition */
+static inline ElfResult validate_ctx(const ElfCtx *ctx)
+{
+        if ((ctx == NULL) || !(CTX(ctx)->initialized))
+                return ELF_UNINIT;
+        
+        return ELF_OK;
+}
+
 ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *ctx)
 {
         uint8_t magic_buff[16];
         ElfResult res = ELF_OK;
         uint8_t header_buff[sizeof(Elf64Header)] = {0};
+
+        if (ctx == NULL)
+                return ELF_BAD_ARG;
 
         CTX(ctx)->initialized = false;
 
@@ -296,12 +165,13 @@ ElfResult parse_header(const ElfCtx *ctx, ElfHeader *header)
         ElfResult res = ELF_OK;
         uint8_t header_buff[sizeof(Elf64Header)] = {0};
 
-        if ((ctx == NULL) || (header == NULL))
+        if (validate_ctx(ctx))
+                return ELF_UNINIT;
+        
+        if(header == NULL)
                 return ELF_BAD_ARG;
 
 
-        if (!CTX(ctx)->initialized)
-                return ELF_UNINIT;
 
         if (CTX(ctx)->Class == CLASS_32)
         {
@@ -313,14 +183,14 @@ ElfResult parse_header(const ElfCtx *ctx, ElfHeader *header)
         }
         if (!res)
         {
-                header->EI_Class       = ((Elf64Header *)header_buff)->EI_Class;
-                header->EI_Data        = ((Elf64Header *)header_buff)->EI_Data;
-                header->EI_Version     = ((Elf64Header *)header_buff)->EI_Version;
-                header->EI_OS_ABI      = ((Elf64Header *)header_buff)->EI_OS_ABI;
-                header->EI_ABI_Version = ((Elf64Header *)header_buff)->EI_ABI_Version;
-                header->Type           = read_16(&((Elf64Header *)header_buff)->Type,    CTX(ctx)->Endianness);
-                header->Machine        = read_16(&((Elf64Header *)header_buff)->Machine, CTX(ctx)->Endianness);
-                header->Version        = read_32(&((Elf64Header *)header_buff)->Version, CTX(ctx)->Endianness);
+                header->EI_Class       = ((Elf64Header *)header_buff)->Info.EI_Class;
+                header->EI_Data        = ((Elf64Header *)header_buff)->Info.EI_Data;
+                header->EI_Version     = ((Elf64Header *)header_buff)->Info.EI_Version;
+                header->EI_OS_ABI      = ((Elf64Header *)header_buff)->Info.EI_OS_ABI;
+                header->EI_ABI_Version = ((Elf64Header *)header_buff)->Info.EI_ABI_Version;
+                header->Type           = read_16(&((Elf64Header *)header_buff)->Info.Type,    CTX(ctx)->Endianness);
+                header->Machine        = read_16(&((Elf64Header *)header_buff)->Info.Machine, CTX(ctx)->Endianness);
+                header->Version        = read_32(&((Elf64Header *)header_buff)->Info.Version, CTX(ctx)->Endianness);
 
                 if (CTX(ctx)->Class == CLASS_32)
                 {
@@ -359,7 +229,7 @@ uint16_t get_section_count(const ElfCtx *ctx)
         returning an error would make this fucntion useless as it would require
         more setup than what it is trying to remove. Returning 0 makes the 
         iteration empty and thus isn't a big safety compromise. */
-        if (ctx == NULL)
+        if (validate_ctx(ctx))
                 return 0;
         
         return CTX(ctx)->SHEntryNum;     
@@ -371,7 +241,7 @@ uint16_t get_program_header_count(const ElfCtx *ctx)
         returning an error would make this fucntion useless as it would require
         more setup than what it is trying to remove. Returning 0 makes the 
         iteration empty and thus isn't a big safety compromise. */
-        if (ctx == NULL)
+        if (validate_ctx(ctx))
                 return 0;
         
         return CTX(ctx)->PHEntryNum;
@@ -382,7 +252,7 @@ ElfResult get_section_header(const ElfCtx *ctx, uint32_t idx, ElfSecHeader *sec_
         ElfResult res = ELF_OK;
         uint8_t sec_head_buff[sizeof(Elf64SecHeader)] = {0};
 
-        if (!CTX(ctx)->initialized)
+        if (validate_ctx(ctx))
                 return ELF_UNINIT;
 
         if (idx >= CTX(ctx)->SHEntryNum)
@@ -460,11 +330,11 @@ ElfResult get_section_name(const ElfCtx *ctx, const ElfSecHeader *sec_header, ui
         ElfSecHeader str_sec_hdr;
         ElfResult res = ELF_OK; 
 
-        if ((ctx == NULL) || (sec_header == NULL) || (buff == NULL) || (len == 0))
-                return ELF_BAD_ARG;
-
-        if (!CTX(ctx)->initialized)
+        if (validate_ctx(ctx))
                 return ELF_UNINIT;
+
+        if ((sec_header == NULL) || (buff == NULL) || (len == 0))
+                return ELF_BAD_ARG;
 
         res = get_section_header(ctx, CTX(ctx)->SecNameStrIndx, &str_sec_hdr);
         if (res)
@@ -474,12 +344,49 @@ ElfResult get_section_name(const ElfCtx *ctx, const ElfSecHeader *sec_header, ui
         return internal_get_str_from_offset(ctx, offset, buff, len);
 }
 
+ElfResult get_section_by_name(const ElfCtx *ctx, const uint8_t *name, ElfSecHeader *sec)
+{
+        ElfResult res = ELF_OK;
+        uint8_t sec_name[256];
+
+        // Already checks that ctx is valid.
+        uint32_t sec_cnt = get_section_count(ctx);
+
+        if ((name == NULL) || (sec_cnt == 0))
+                return ELF_BAD_ARG;
+        
+        // Skip NULL section
+        for (uint32_t i = 1; i < sec_cnt; i++)
+        {
+                // already checks that sec is valid
+                res = get_section_header(ctx, i, sec);
+                if (res != ELF_OK)
+                        return res;
+
+                res = get_section_name(ctx, sec, sec_name, sizeof(sec_name));
+                if (res != ELF_OK)
+                        return res;
+
+                for (uint16_t j = 0; j < 256; j++)
+                {
+
+                        if (name[j] != sec_name[j])
+                                break;
+
+                        // equality already considered in the previous check
+                        if ((name[j] == '\0'))
+                                return ELF_OK;
+                }
+        }
+        return ELF_NOT_FOUND;
+}
+
 ElfResult get_program_header(const ElfCtx *ctx, uint32_t idx, ElfProHeader *prog_header)
 {
         ElfResult res = ELF_OK;
         uint8_t prog_head_buff[sizeof(Elf64ProHeader)] = {0};
 
-        if (!CTX(ctx)->initialized)
+        if (validate_ctx(ctx))
                 return ELF_UNINIT;
 
         if (idx >= CTX(ctx)->PHEntryNum)
@@ -529,7 +436,7 @@ uint32_t get_symbol_count(const ElfCtx *ctx, const ElfSecHeader *sym_tab)
         returning an error would make this fucntion useless as it would require
         more setup than what it is trying to remove. Returning 0 makes the 
         iteration empty and thus isn't a big safety compromise. */
-        if((ctx == NULL) ||(sym_tab == NULL) || (sym_tab->EntrySize == 0))
+        if(validate_ctx(ctx) ||(sym_tab == NULL) || (sym_tab->EntrySize == 0))
                 return 0;
         
         return sym_tab->Size/sym_tab->EntrySize;
@@ -541,7 +448,7 @@ ElfResult get_symbol_entry(const ElfCtx *ctx, const ElfSecHeader *sym_tab, uint3
         ElfResult res = ELF_OK;
         uint8_t sym_buff[sizeof(Elf64SymEntry)] = {0};
 
-        if (!CTX(ctx)->initialized)
+        if (validate_ctx(ctx))
                 return ELF_UNINIT;
 
         if((sym_tab == NULL)||(sym == NULL))
@@ -644,6 +551,43 @@ ElfResult get_symbol_by_addr_range(const ElfCtx *ctx, const ElfSecHeader *sym_ta
                         return ELF_OK;
         }
         return ELF_NOT_FOUND;       
+}
+
+ElfResult get_symbol_by_name(const ElfCtx *ctx, const uint8_t *name, const ElfSecHeader *sym_tab, ElfSymTabEntry *sym)
+{
+        ElfResult res = ELF_OK;
+        uint8_t sym_name[256];
+
+        // Already checks that ctx & sym_tab are valid.
+        uint32_t sym_cnt = get_symbol_count(ctx, sym_tab);
+
+        if ((name == NULL) || (sym_cnt == 0))
+                return ELF_BAD_ARG;
+        
+        // Skip NULL symbol
+        for (uint32_t i = 1; i < sym_cnt; i++)
+        {
+                // Checks that sym is valid.
+                res = get_symbol_entry(ctx, sym_tab, i, sym);
+                if (res != ELF_OK)
+                        return res;
+
+                res = get_symbol_name(ctx, sym_tab->Link, sym, sym_name, sizeof(sym_name));
+                if (res != ELF_OK)
+                        return res;
+
+                for (uint16_t j = 0; j < 256; j++)
+                {
+
+                        if (name[j] != sym_name[j])
+                                break;
+
+                        // equality already considered in the previous check
+                        if ((name[j] == '\0'))
+                                return ELF_OK;
+                }
+        }
+        return ELF_NOT_FOUND;
 }
 
 ElfResult get_str_from_table(const ElfCtx *ctx, uint32_t sec_idx, uint32_t str_idx, uint8_t *buff, uint16_t len)
