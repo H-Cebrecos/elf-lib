@@ -20,6 +20,7 @@
  * SOFTWARE.
  */
 
+#include <stddef.h>
 #include "common/elf_core.h"
 #include "common/elf_common.h"
 #include "elf_reader.h"
@@ -47,7 +48,7 @@ _Static_assert(sizeof(InternalElfCtx) <= ELF_CTX_SIZE, "ELF_CTX_SIZE too small")
 /** Read functions with automatic host-endian detection */
 static inline uint16_t read_16(const uint16_t *data, EiData elf_endianness) {
         uint16_t v = *data;
-        if (elf_endianness != host_endianness() && elf_endianness != DATA_NONE) {
+        if ((elf_endianness != host_endianness()) && (elf_endianness != DATA_NONE)) {
             v = swap16(v);
         }
         return v;
@@ -55,7 +56,7 @@ static inline uint16_t read_16(const uint16_t *data, EiData elf_endianness) {
     
 static inline uint32_t read_32(const uint32_t *data, EiData elf_endianness) {
         uint32_t v = *data;
-        if (elf_endianness != host_endianness() && elf_endianness != DATA_NONE) {
+        if ((elf_endianness != host_endianness()) && (elf_endianness != DATA_NONE)) {
             v = swap32(v);
         }
         return v;
@@ -63,7 +64,7 @@ static inline uint32_t read_32(const uint32_t *data, EiData elf_endianness) {
     
 static inline uint64_t read_64(const uint64_t *data, EiData elf_endianness) {
         uint64_t v = *data;
-        if (elf_endianness != host_endianness() && elf_endianness != DATA_NONE) {
+        if ((elf_endianness != host_endianness()) && (elf_endianness != DATA_NONE)) {
             v = swap64(v);
         }
         return v;
@@ -304,11 +305,10 @@ ElfResult get_section_header(const ElfCtx *ctx, uint32_t idx, ElfSecHeader *sec_
 // internal fuction, does not perform argument checks
 static ElfResult internal_get_str_from_offset(const ElfCtx *ctx, uint64_t offset, uint8_t *buff, uint16_t len)
 {
-        ElfResult res = ELF_OK;
         uint16_t i = 0;
-
+        
         while (i < (len)) {
-                res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, offset + i, 1, &buff[i]);
+                ElfResult res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, offset + i, 1, &buff[i]);
                 if (res)
                         return res;
 
@@ -346,7 +346,6 @@ ElfResult get_section_name(const ElfCtx *ctx, const ElfSecHeader *sec_header, ui
 
 ElfResult get_section_by_name(const ElfCtx *ctx, const uint8_t *name, ElfSecHeader *sec)
 {
-        ElfResult res = ELF_OK;
         uint8_t sec_name[256];
 
         // Already checks that ctx is valid.
@@ -359,7 +358,7 @@ ElfResult get_section_by_name(const ElfCtx *ctx, const uint8_t *name, ElfSecHead
         for (uint32_t i = 1; i < sec_cnt; i++)
         {
                 // already checks that sec is valid
-                res = get_section_header(ctx, i, sec);
+                ElfResult res = get_section_header(ctx, i, sec);
                 if (res != ELF_OK)
                         return res;
 
@@ -498,7 +497,6 @@ ElfResult get_symbol_name(const ElfCtx *ctx, uint32_t str_tab_idx, const ElfSymT
 
 ElfResult get_symbol_by_addr_exact( const ElfCtx *ctx, const ElfSecHeader *sym_tab, uint64_t addr, ElfSymTabEntry *sym)
 {
-        ElfResult res = ELF_OK;
         // Already checks that ctx & sym_tab are valid.
         uint32_t sym_cnt = get_symbol_count(ctx, sym_tab);
 
@@ -509,7 +507,7 @@ ElfResult get_symbol_by_addr_exact( const ElfCtx *ctx, const ElfSecHeader *sym_t
         for (uint32_t i = 1; i < sym_cnt; i++)
         {
                 // Checks that sym is valid.
-                res = get_symbol_entry(ctx, sym_tab, i, sym);
+                ElfResult res = get_symbol_entry(ctx, sym_tab, i, sym);
                 if (res != ELF_OK)
                         return res;
 
@@ -528,18 +526,17 @@ ElfResult get_symbol_by_addr_exact( const ElfCtx *ctx, const ElfSecHeader *sym_t
 
 ElfResult get_symbol_by_addr_range(const ElfCtx *ctx, const ElfSecHeader *sym_tab, uint64_t addr, ElfSymTabEntry *sym)
 {
-        ElfResult res = ELF_OK;
         // Already checks that ctx & sym_tab are valid.
         uint32_t sym_cnt = get_symbol_count(ctx, sym_tab);
 
-        if (sym_cnt == 0)
+        if (sym_cnt == 0U)
                 return ELF_BAD_ARG;
         
         // Skip NULL symbol
         for (uint32_t i = 1; i < sym_cnt; i++)
         {
                 // Checks that sym is valid.
-                res = get_symbol_entry(ctx, sym_tab, i, sym);
+                ElfResult res = get_symbol_entry(ctx, sym_tab, i, sym);
                 if (res != ELF_OK)
                         return res;
 
@@ -555,7 +552,7 @@ ElfResult get_symbol_by_addr_range(const ElfCtx *ctx, const ElfSecHeader *sym_ta
 
 ElfResult get_symbol_by_name(const ElfCtx *ctx, const uint8_t *name, const ElfSecHeader *sym_tab, ElfSymTabEntry *sym)
 {
-        ElfResult res = ELF_OK;
+        ElfResult res;
         uint8_t sym_name[256];
 
         // Already checks that ctx & sym_tab are valid.

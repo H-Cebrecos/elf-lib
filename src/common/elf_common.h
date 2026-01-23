@@ -149,17 +149,17 @@ static inline EiData host_endianness(void) {
         uint16_t x = 1;
         return (*(uint8_t *)&x) ? DATA_LSB : DATA_MSB;
 }
-    
+
 /** Swap helpers */
 static inline uint16_t swap16(uint16_t v) {
         return (v >> 8) | (v << 8);
 }
     
 static inline uint32_t swap32(uint32_t v) {
-        return ((v >> 24) & 0x000000FF) |
-               ((v >> 8)  & 0x0000FF00) |
-               ((v << 8)  & 0x00FF0000) |
-               ((v << 24) & 0xFF000000);
+        return ((v >> 24) & 0x000000FFUL) |
+               ((v >> 8)  & 0x0000FF00UL) |
+               ((v << 8)  & 0x00FF0000UL) |
+               ((v << 24) & 0xFF000000UL);
 }
     
 static inline uint64_t swap64(uint64_t v) {

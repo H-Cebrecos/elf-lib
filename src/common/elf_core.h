@@ -231,7 +231,7 @@ typedef enum ElfResult
 typedef ElfResult (*elf_read_callback)(
     void *user_ctx,  // user-provided context (file handle, pointer, etc.)
     uint64_t offset, // absolute offset in the "file"
-    size_t size,     // number of bytes requested
+    uint64_t size,     // number of bytes requested
     uint8_t *buffer     // destination buffer (already allocated by caller a.k.a the library)
 );
 

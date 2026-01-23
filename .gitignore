@@ -53,3 +53,12 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Planning files
+*.todo
+
+# Configurations
+*.json
+
+# Misra
+suppres.txt
