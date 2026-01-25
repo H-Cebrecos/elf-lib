@@ -37,6 +37,16 @@ typedef enum {
     ELFW_LAYOUT_MINIMAL
 } ElfwLayoutPolicy;
 
+//TODO: think about this.
+// Same callback shape as reader, but used for writing
+// Returns ELF_OK on success
+typedef ElfResult (*ElfIOCallback)(
+        void *user,
+        uint64_t offset,
+        uint64_t size,
+        const void *buffer);
+
+
 /**
  * Create a new ELF writer context.
  *
@@ -59,11 +69,7 @@ typedef enum {
  * @return Pointer to a newly created ElfwCtx on success, or NULL on
  *         allocation or parameter validation failure.
  */
-ElfwCtx *elfw_create(EiClass class, EiData data, ElfType type, ElfMachine machine, ElfABI os_abi, uint8_t abi_version, uint64_t entry);
-
-//TODO next:
-//elfw_add_section
-//elfw_set_section_data or something like that.
+ElfwCtx *elfw_create(void);
 
 /**
  * Destroy an ELF writer context.
@@ -78,9 +84,41 @@ ElfwCtx *elfw_create(EiClass class, EiData data, ElfType type, ElfMachine machin
  */
 void     elfw_destroy(ElfwCtx *ctx);
 
-//TODO:
-//ElfResult elfw_write_file(const ElfwCtx *ctx, const char *path);
-//ElfResult elfw_write(const ElfwCtx *ctx, const ElfwSink *sink);
+typedef struct
+{
+        EiClass     class;
+        EiData      endianness;
+        ElfType     type;
+        ElfMachine  machine;
+        ElfABI      os_abi;
+        uint8_t     abi_version;
+
+        uint64_t    entry;
+        uint32_t    flags;
+} ElfwHeaderCreateInfo;
+
+//TODO: this is good for now but it leaks to much info to the user, split into internal doc and API doc.
+/**
+ * @param ctx  Writer context, initialized with elfw_create().
+ * @param info Header creation parameters describing the ELF file identity
+ *             and layout (class, endianness, ABI, entry point, and table offsets).
+ * @return Error code.
+ *
+ * @brief Creates and initializes the ELF file header.
+ *
+ * Allocates and initializes an ELF header according to the values provided in
+ * @p info. The header is stored internally in the writer context and may be
+ * further updated during layout (e.g. program/section header counts and
+ * string table index).
+ *
+ * The program header table and section header table offsets may be zero to
+ * indicate that the corresponding table is not present.
+ *
+ * This function does not write any data to the output; it only prepares the
+ * in-memory representation of the ELF header.
+ */
+ElfResult elfw_create_header(ElfwCtx *ctx, const ElfwHeaderCreateInfo *info);
+
 
 
 #endif // Include guard;

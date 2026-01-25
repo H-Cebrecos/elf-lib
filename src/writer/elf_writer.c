@@ -67,14 +67,7 @@ typedef struct
 
 struct ElfwCtx
 {
-        EiClass Class;
-        EiData Endianness;
-        ElfType Type;
-        ElfMachine Machine;
-        ElfABI OS_ABI;
-        uint8_t ABI_Version;
-
-        uint64_t Entry;
+        Elf64Header *Head;
 
         ElfWSection *Sections;
         size_t Section_count;
@@ -82,17 +75,13 @@ struct ElfwCtx
 
         ElfWSegment *Segments;
         size_t Segment_count;
-        size_t Segment_cap;
+        size_t Segment_cap; // capacity
+
+        ElfIOCallback Callback;
+        void *UserCtx;
 };
 
-ElfwCtx *elfw_create(
-    EiClass class,
-    EiData data,
-    ElfType type,
-    ElfMachine machine,
-    ElfABI os_abi,
-    uint8_t abi_version,
-    uint64_t entry)
+ElfwCtx *elfw_create(void)
 {
         ElfwCtx *res;
         ElfwCtx *ctx = calloc(1, sizeof(*ctx));
@@ -102,17 +91,7 @@ ElfwCtx *elfw_create(
         }
         else
         {
-
-                ctx->Class = class;
-                ctx->Endianness = data;
-
-                /* Sensible defaults */
-                ctx->Type = type;
-                ctx->Machine = machine;
-                ctx->OS_ABI = os_abi;
-                ctx->ABI_Version = abi_version;
-                ctx->Entry = entry;
-
+                ctx->Head = NULL;
                 ctx->Sections = NULL;
                 ctx->Section_count = 0;
                 ctx->Section_cap = 0;
@@ -133,6 +112,10 @@ void elfw_destroy(ElfwCtx *ctx)
 {
         if (ctx != NULL)
         {
+                if(ctx->Head != NULL)
+                {
+                        free(ctx->Head);
+                }
 
                 if (ctx->Sections != NULL)
                 {
@@ -156,41 +139,44 @@ void elfw_destroy(ElfwCtx *ctx)
         }
 }
 
-// TODO: short doc, pass null if there are no tables.
-static ElfResult elfw_write_header(const ElfwCtx *ctx, uint64_t phoff, uint64_t shoff)
+ElfResult elfw_create_header(ElfwCtx *ctx, const ElfwHeaderCreateInfo *info)
 {
-
         if (ctx == NULL)
                 return ELF_UNINIT;
 
-        Elf64Header header = {
+        Elf64Header *header = malloc(sizeof(*header));
+        if (header == NULL)
+                return ELF_IO_ERROR; /* . //TODO: or ELF_NO_MEM if you add it */
+
+        *header = (Elf64Header){
             .Info = {
-                .Magic = {0x7f, 'E', 'L', 'F'},
-                .EI_Class = ctx->Class,
-                .EI_Data = ctx->Endianness,
+                .Magic      = {0x7f, 'E', 'L', 'F'},
+                .EI_Class   = info->class,
+                .EI_Data    = info->endianness,
                 .EI_Version = 1,
-                .EI_OS_ABI = ctx->OS_ABI,
-                .EI_ABI_Version = ctx->ABI_Version,
-                .Pad = {0},
-                .Type = ctx->Type,
-                .Machine = ctx->Machine,
+                .EI_OS_ABI  = info->os_abi,
+                .EI_ABI_Version = info->abi_version,
+                .Pad     = {0},
+                .Type    = info->type,
+                .Machine = info->machine,
                 .Version = 1,
             },
-            .Entry = ctx->Entry,
-            .ProHeadOff = phoff,
-            .SecHeadOff = shoff,
+            .Flags      = info->flags,
+            .Entry      = info->entry,
+            
+            .HeadSize = sizeof(Elf64Header),
+            .PHEntrySize = sizeof(Elf64ProHeader),
+            .SHEntrySize = sizeof(Elf64SecHeader),
+            
+            /* Filled later */
+            .SecHeadOff = 0,
+            .ProHeadOff = 0,
+            .PHEntryNum = 0,
+            .SHEntryNum = 0,
+            .SecNameStrIndx = 0,
         };
 
-        // TODO: logic for the rest of the fields.
-        // TODO: endianness aware writing
-        // TODO: writer api.
+        ctx->Head = header;
 
-        if (ctx->Class == CLASS_32)
-        {
-                //TODO!
-        }
-        else // 64 bit
-        {
-                
-        }
+        return ELF_OK;
 }
