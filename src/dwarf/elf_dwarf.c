@@ -194,7 +194,7 @@ static DwrfResult decode_SLEB128(const uint8_t* sleb128, int64_t *val, uint8_t *
         do
         {
                 byte = *sleb128++;
-                int64_t temp = (int64_t)(byte & 0x7F);
+                uint64_t temp = (uint64_t)(byte & 0x7F);
 
                 count++;
                 
@@ -208,7 +208,7 @@ static DwrfResult decode_SLEB128(const uint8_t* sleb128, int64_t *val, uint8_t *
 
         /* sign extend if sign bit of last byte is set */
         if ((shift < 64) && (byte & 0x40))
-                *val |=  (int64_t)((~0) << shift);
+                *val |=  (int64_t)((~0U) << shift);
         
         *len = count;
         return DWRF_OK;

@@ -218,12 +218,10 @@ typedef enum ElfResult
         ELF_NOT_FOUND,
         ELF_BUFFER_OVERFLOW,
         ELF_IO_EOF,
-        ELF_IO_ERROR
+        ELF_IO_ERROR,
+        ELF_NO_MEM
 } ElfResult;
 
-
-
-// TODO: Better explanation
 /**
  * @brief callback abstracks how de system may be reading the elf file, it can be implemented over a file system, a contiguous memory region
  * or dynamically loaded upon request. The user_ctx can be used by the user to store data between calls to the function.
@@ -235,8 +233,6 @@ typedef ElfResult (*elf_read_callback)(
     uint8_t *buffer     // destination buffer (already allocated by caller a.k.a the library)
 );
 
-// TODO: Explanation on how to use and reasoning behind the api.
-
 /**
  * @param user_ctx Pointer to user defined structure that holds arbitrary data needed by the callback. NULL if unused.
  * @param callback Callback function to abtract the IO implemetation of the elf file.
@@ -246,4 +242,5 @@ typedef ElfResult (*elf_read_callback)(
  */
 ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *cxt);
 
-#endif // Include guard;
+#endif
+ // Include guard;
