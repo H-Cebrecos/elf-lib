@@ -242,5 +242,4 @@ typedef ElfResult (*elf_read_callback)(
  */
 ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *cxt);
 
-#endif
- // Include guard;
+#endif // Include guard;

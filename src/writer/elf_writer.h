@@ -74,15 +74,14 @@ ElfwCtx *elfw_create(void);
 /**
  * Destroy an ELF writer context.
  *
- * Frees all resources owned by the context, including any sections,
- * segments, or auxiliary buffers that were created during ELF
- * construction. Passing NULL is allowed and has no effect.
- *
+ * Frees all resources owned by the context. 
  * After this call, the context pointer and related handles must not be used again.
+ * 
+ * @note Passing NULL is allowed and has no effect.
  *
  * @param ctx Pointer to an ElfwCtx previously returned by elfw_create().
  */
-void     elfw_destroy(ElfwCtx *ctx);
+void elfw_destroy(ElfwCtx *ctx);
 
 typedef struct
 {
@@ -121,91 +120,95 @@ ElfResult elfw_create_header(ElfwCtx *ctx, const ElfwHeaderCreateInfo *info);
 
 
 /****************
+ *   Sections   *
+ ****************/
+        /**
+         * @brief handle to a section element, used to set the data for the section.
+         * Calling elfw_destroy invalidates all section handles.
+         */
+        //TODO: remove before release, it breaks linter:  typedef sec_hndl sec_hndl;
+
+        /* TODO: provide helpers for common types of sections such as string tables.
+         *  - String tables:        .strtab, .shstrtab, .dynstr
+         *  - Symbol tables:        .symtab, .dynsym
+         *  - Code sections:        .text
+         *  - Read-only data:       .rodata
+         *  - Writable data:        .data
+         *  - Zero-initialized:     .bss (SHT_NOBITS)
+         *  - Relocations:          .rel.*, .rela.*
+         *  - Notes:                .note.*
+         *  - Dynamic linking:      .dynamic
+         *  - GOT / PLT:            .got, .plt
+         *  - Exception handling:   .eh_frame, .eh_frame_hdr
+         *  - Debug info:           .debug_*
+         */
+        typedef struct
+        {
+                const char * Name;
+                ElfSectionType Type;
+                uint64_t Flags;
+                uint64_t Address;
+                sec_hndl Link;
+                uint32_t Info;
+                uint64_t Alignment;
+                uint64_t EntrySize;
+        }ElfwSectionCreateInfo;
+
+        /**
+         * @brief Creates a new section.
+         *
+         * @param ctx       Valid ELF writer context.
+         * @param info      Section creation parameters. (copied internally)
+         * @param new_sec   Output pointer receiving the newly created section handle.
+         *
+         * @note All section handles become invalid after elfw_destroy().
+         */
+        ElfResult elfw_add_section(ElfwCtx *ctx, const ElfwSectionCreateInfo *info, sec_hndl *new_sec);
+
+        /**
+         * @brief Replaces all previous section data with a single new chunk.
+         *
+         * @param section   Valid section handle.
+         * @param data      Pointer to the data buffer.
+         * @param size      Size of the data buffer in bytes.
+         * @param align     Required alignment of the chunk within the section.
+         *
+         * @return ELF_OK on success, or an error code on failure.
+         * 
+         * @note The data is not copied and must remain valid until the ELF is written.
+         */
+        ElfResult elfw_section_set_data(sec_hndl section, const void *data, uint64_t size, uint64_t align);
+
+        /**
+         * @brief Appends a data chunk to the section.
+         *
+         * @param section   Valid section handle.
+         * @param data      Pointer to the data buffer.
+         * @param size      Size of the data buffer in bytes.
+         * @param align     Required alignment of the chunk within the section.
+         *
+         * @return ELF_OK on success, or an error code on failure.
+         * 
+         * @note The data is not copied and must remain valid until the ELF is written.
+         */
+        ElfResult elfw_section_append_data(sec_hndl section, const void *data, uint64_t size, uint64_t align);
+
+        /**
+         * @brief Returns the offset where the next chunk would be placed.
+         *
+         * The offset is relative to the start of the section and satisfies @p align.
+         * This function does not modify section state.
+         *
+         * @param section   Valid section handle.
+         * @param align     Required alignment of the prospective chunk.
+         *
+         * @return Offset in bytes from the start of the section.
+         */
+        uint64_t elfw_section_next_offset(sec_hndl section, uint64_t align);
+
+/****************
  *   Segments   *
  ****************/
- /**
-  * @brief handle to a section element, used to set the data for the section.
-  * Calling elfw_destroy invalidates all section handles.
-  */
-typedef sec_hndl sec_hndl;
-
-/* TODO: provide helpers for common types of sections such as string tables.
- *  - String tables:        .strtab, .shstrtab, .dynstr
- *  - Symbol tables:        .symtab, .dynsym
- *  - Code sections:        .text
- *  - Read-only data:       .rodata
- *  - Writable data:        .data
- *  - Zero-initialized:     .bss (SHT_NOBITS)
- *  - Relocations:          .rel.*, .rela.*
- *  - Notes:                .note.*
- *  - Dynamic linking:      .dynamic
- *  - GOT / PLT:            .got, .plt
- *  - Exception handling:   .eh_frame, .eh_frame_hdr
- *  - Debug info:           .debug_*
- */
-typedef struct
-{
-        ElfSectionType Type;
-        uint64_t Flags;
-        uint64_t Address;
-        sec_hndl Link;
-        uint32_t Info;
-        uint64_t Alignment;
-        uint64_t EntrySize;
-}ElfwSectionCreateInfo;
-
-/**
- * @brief Creates a new section.
- *
- * @param ctx       Valid ELF writer context.
- * @param name      Null-terminated section name. The string is copied internally.
- * @param info      Section creation parameters.
- * @param new_sec   Output pointer receiving the newly created section handle.
- *
- * @note All section handles become invalid after elfw_destroy().
- */
-ElfResult elfw_add_section(ElfwCtx *ctx, const char *name, const *ElfwSectionCreateInfo, sec_hndl *new_sec);
-
-/**
- * @brief Replaces all previous section data with a single new chunk.
- *
- * @param section   Valid section handle.
- * @param data      Pointer to the data buffer.
- * @param size      Size of the data buffer in bytes.
- * @param align     Required alignment of the chunk within the section.
- *
- * @return ELF_OK on success, or an error code on failure.
- * 
- * @note The data is not copied and must remain valid until the ELF is written.
- */
-ElfResult elfw_section_set_data(sec_hndl section, const void *data, uint64_t size, uint64_t align);
-
-/**
- * @brief Appends a data chunk to the section.
- *
- * @param section   Valid section handle.
- * @param data      Pointer to the data buffer.
- * @param size      Size of the data buffer in bytes.
- * @param align     Required alignment of the chunk within the section.
- *
- * @return ELF_OK on success, or an error code on failure.
- * 
- * @note The data is not copied and must remain valid until the ELF is written.
- */
-ElfResult elfw_section_append_data(sec_hndl section, const void *data, uint64_t size, uint64_t align);
-
-/**
- * @brief Returns the offset where the next chunk would be placed.
- *
- * The offset is relative to the start of the section and satisfies @p align.
- * This function does not modify section state.
- *
- * @param ctx       Valid ELF writer context.
- * @param section   Valid section handle.
- * @param align     Required alignment of the prospective chunk.
- *
- * @return Offset in bytes from the start of the section.
- */
-uint64_t elfw_section_next_offset(ElfwCtx *ctx, sec_hndl section, uint64_t align);
+        //TODO
 
 #endif // Include guard;
