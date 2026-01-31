@@ -30,25 +30,8 @@
  */
 typedef struct ElfwCtx ElfwCtx;
 
-typedef enum {
-    ELFW_LAYOUT_FAST,
-    ELFW_LAYOUT_COMPAT,
-    ELFW_LAYOUT_PACKED,
-    ELFW_LAYOUT_MINIMAL
-} ElfwLayoutPolicy;
-
-//TODO: think about this.
-// Same callback shape as reader, but used for writing
-// Returns ELF_OK on success
-typedef ElfResult (*ElfIOCallback)(
-        void *user,
-        uint64_t offset,
-        uint64_t size,
-        const void *buffer);
-
-
 /**
- * Create a new ELF writer context.
+ * @brief Create a new ELF writer context.
  *
  * Allocates and initializes an ELF writer context that will be used to
  * construct a valid ELF file in memory. The parameters provided here
@@ -58,21 +41,13 @@ typedef ElfResult (*ElfIOCallback)(
  * This function allocates heap memory; the returned context must be
  * released with elfw_destroy().
  *
- * @param class        ELF class (ELFCLASS32 or ELFCLASS64).
- * @param data         Data encoding / endianness (ELFDATA2LSB or ELFDATA2MSB).
- * @param type         ELF file type (e.g. ET_EXEC, ET_DYN, ET_REL).
- * @param machine      Target machine architecture (e.g. EM_X86_64).
- * @param os_abi       Target OS ABI (e.g. ELFOSABI_SYSV).
- * @param abi_version  ABI version, interpretation depends on OS ABI.
- * @param entry        Entry point virtual address (e_entry).
- *
  * @return Pointer to a newly created ElfwCtx on success, or NULL on
  *         allocation or parameter validation failure.
  */
 ElfwCtx *elfw_create(void);
 
 /**
- * Destroy an ELF writer context.
+ * @brief Destroy an ELF writer context.
  *
  * Frees all resources owned by the context. 
  * After this call, the context pointer and related handles must not be used again.
@@ -83,41 +58,37 @@ ElfwCtx *elfw_create(void);
  */
 void elfw_destroy(ElfwCtx *ctx);
 
-typedef struct
-{
-        EiClass     Class;
-        EiData      Endianness;
-        ElfType     Type;
-        ElfMachine  Machine;
-        ElfABI      Os_abi;
-        uint8_t     Abi_version;
+/****************
+ *    Header    *
+ ****************/
+        typedef struct
+        {
+                EiClass     Class;
+                EiData      Endianness;
+                ElfType     Type;
+                ElfMachine  Machine;
+                ElfABI      Os_abi;
+                uint8_t     Abi_version;
 
-        uint64_t    Entry;
-        uint32_t    Flags;
-} ElfwHeaderCreateInfo;
+                uint64_t    Entry;
+                uint32_t    Flags;
+        } ElfwHeaderCreateInfo;
 
-//TODO: this is good for now but it leaks to much info to the user, split into internal doc and API doc.
-/**
- * @param ctx  Writer context, initialized with elfw_create().
- * @param info Header creation parameters describing the ELF file identity
- *             and layout (class, endianness, ABI, entry point, and table offsets).
- * @return Error code.
- *
- * @brief Creates and initializes the ELF file header.
- *
- * Allocates and initializes an ELF header according to the values provided in
- * @p info. The header is stored internally in the writer context and may be
- * further updated during layout (e.g. program/section header counts and
- * string table index).
- *
- * The program header table and section header table offsets may be zero to
- * indicate that the corresponding table is not present.
- *
- * This function does not write any data to the output; it only prepares the
- * in-memory representation of the ELF header.
- */
-ElfResult elfw_create_header(ElfwCtx *ctx, const ElfwHeaderCreateInfo *info);
-
+        /**
+         * @param ctx  Writer context, initialized with elfw_create().
+         * @param info Header creation parameters describing the ELF file identity
+         *
+         * @return Error code.
+         *
+         * @brief Creates and initializes the ELF file header.
+         *
+         * Allocates and initializes an ELF header according to the values provided in @p info. 
+         * Calling this function multiple times redefines the header overwritting the previous
+         * one, Changing the Class (32/64 bit) or type of file is not allowed. This operation 
+         * can be postponed until before writting the final file so it is recomended to call it
+         * only once, when all the necessary settings have been decided.
+         */
+        ElfResult elfw_create_header(ElfwCtx *ctx, const ElfwHeaderCreateInfo *info);
 
 /****************
  *   Sections   *
@@ -126,7 +97,7 @@ ElfResult elfw_create_header(ElfwCtx *ctx, const ElfwHeaderCreateInfo *info);
          * @brief handle to a section element, used to set the data for the section.
          * Calling elfw_destroy invalidates all section handles.
          */
-        //TODO: remove before release, it breaks linter:  typedef sec_hndl sec_hndl;
+        typedef struct ElfWSection *sec_hndl;
 
         /* TODO: provide helpers for common types of sections such as string tables.
          *  - String tables:        .strtab, .shstrtab, .dynstr
@@ -171,7 +142,7 @@ ElfResult elfw_create_header(ElfwCtx *ctx, const ElfwHeaderCreateInfo *info);
          * @param section   Valid section handle.
          * @param data      Pointer to the data buffer.
          * @param size      Size of the data buffer in bytes.
-         * @param align     Required alignment of the chunk within the section.
+         * @param align     Required alignment of the chunk within the section. (must be a power of two)
          *
          * @return ELF_OK on success, or an error code on failure.
          * 
@@ -185,7 +156,7 @@ ElfResult elfw_create_header(ElfwCtx *ctx, const ElfwHeaderCreateInfo *info);
          * @param section   Valid section handle.
          * @param data      Pointer to the data buffer.
          * @param size      Size of the data buffer in bytes.
-         * @param align     Required alignment of the chunk within the section.
+         * @param align     Required alignment of the chunk within the section. (must be a power of two)
          *
          * @return ELF_OK on success, or an error code on failure.
          * 
@@ -200,7 +171,7 @@ ElfResult elfw_create_header(ElfwCtx *ctx, const ElfwHeaderCreateInfo *info);
          * This function does not modify section state.
          *
          * @param section   Valid section handle.
-         * @param align     Required alignment of the prospective chunk.
+         * @param align     Required alignment of the prospective chunk. (must be a power of two)
          *
          * @return Offset in bytes from the start of the section.
          */
@@ -210,5 +181,14 @@ ElfResult elfw_create_header(ElfwCtx *ctx, const ElfwHeaderCreateInfo *info);
  *   Segments   *
  ****************/
         //TODO
+
+
+
+typedef enum {
+    ELFW_LAYOUT_FAST,
+    ELFW_LAYOUT_COMPAT,
+    ELFW_LAYOUT_PACKED,
+    ELFW_LAYOUT_MINIMAL
+} ElfwLayoutPolicy;
 
 #endif // Include guard;

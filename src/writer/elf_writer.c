@@ -78,9 +78,10 @@ typedef struct
 } Chunk;
 
 /* Internal section representation */
-typedef struct
+typedef struct ElfWSection ElfWSection;
+struct ElfWSection
 {
-        char *Name; // TODO: ensure that it is copied internally as promised in the API
+        char *Name;
         ElfSectionType Type;
         uint64_t Flags;
         uint64_t StartAddr;
@@ -93,9 +94,8 @@ typedef struct
 
         // Next free address after the data
         uint64_t Offset;
-} ElfWSection;
+};
 
-typedef ElfWSection *sec_hndl;
 // typedef struct
 //{
 //         uint32_t type;
@@ -137,9 +137,6 @@ struct ElfwCtx
 
         ElfwVec Sections;
         ElfwVec Segments;
-
-        ElfIOCallback Callback;
-        void *UserCtx;
 };
 
 ElfwCtx *elfw_create(void)
@@ -226,7 +223,7 @@ ElfResult elfw_add_section(ElfwCtx *ctx, const ElfwSectionCreateInfo *info, sec_
 {
         *new_sec = NULL;
 
-        if ((ctx == NULL) || (ctx->Head == NULL))
+        if (ctx == NULL)
                 return ELF_UNINIT;
 
         if ((info == NULL) || (new_sec == NULL))
@@ -272,9 +269,13 @@ ElfResult elfw_add_section(ElfwCtx *ctx, const ElfwSectionCreateInfo *info, sec_
 
                 case SECTION_DYNSYM:
                 case SECTION_SYMTAB:
-                        uint64_t expected = (ctx->Head->Info.EI_Class == CLASS_32) ? sizeof(Elf32SymEntry) : sizeof(Elf64SymEntry);
-                        if (info->EntrySize != expected)
-                                return ELF_BAD_ARG;
+                        if (ctx->Head != NULL)
+                        {
+                                uint64_t expected = (ctx->Head->Info.EI_Class == CLASS_32) ? sizeof(Elf32SymEntry) : sizeof(Elf64SymEntry);
+                                if (info->EntrySize != expected)
+                                        return ELF_BAD_ARG;
+                        }
+
                         break;
 
                 default:
@@ -354,23 +355,25 @@ ElfResult elfw_section_append_data(sec_hndl section, const void *data, uint64_t 
 
         Chunk *chk = malloc(sizeof(*chk));
         
-        chk->data  = data,
-        chk->size  = size,
-        chk->align = align,
+        chk->data  = data;
+        chk->size  = size;
+        chk->align = align;
         
         elfw_vec_push(&(section->Chunks), &chk);
 
-        section->Offset = 0; // TODO: compute new address index.
+        section->Offset =elfw_section_next_offset(section, align) + size;
 
         return ELF_OK;
 }
 
 uint64_t elfw_section_next_offset(sec_hndl section, uint64_t align)
 {
-        // TODO: get cached next address index (consider uninit case)
-        // TODO: perform aligment computation
-
-        return 0;
+        // Power of 2 aligment:
+        //  - Add (alignment - 1) to the current offset. This ensures that
+        //    any remainder will carry the value past the next multiple.
+        //  - Clear the lower bits corresponding to the alignment using bitwise AND with ~(alignment - 1),
+        //    effectively rounding down to the nearest multiple of `alignment`.
+        return (section->Offset + align - 1) & ~(align- 1);
 }
 
 static ElfResult elfw_vec_init(ElfwVec *v)
