@@ -30,7 +30,7 @@
  * @param header (out) User allocated struct to be filled.
  * @return Error code
  */
-ElfResult parse_header(const ElfCtx *ctx, ElfHeader *header);
+ElfResult get_header(const ElfCtx *ctx, ElfHeader *header);
 
 /**
  * @param ctx Lib context, initialized on Elf_init().

@@ -29,7 +29,7 @@
 static ElfResult file_read_cb(void *user_ctx, uint64_t offset, size_t size, uint8_t *buffer)
 {
     FILE *f = (FILE *)user_ctx;
-    if (fseeko(f, (off_t)offset, SEEK_SET) != 0)
+    if (fseeko(f, offset, SEEK_SET) != 0)
     {
         return ELF_IO_ERROR;
     }
