@@ -81,6 +81,7 @@ ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *ctx)
         ElfResult res = ELF_OK;
         ElfInfo hdr_info;
         uint8_t header_buff[sizeof(Elf64Header)] = {0};
+        ElfSecHeader null_sec;
 
         if (ctx == NULL)
         {
@@ -120,16 +121,19 @@ ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *ctx)
         }
 
         CTX(ctx)->Class= (EiClass)hdr_info.EI_Class;
-        if (CTX(ctx)->Class == ELFCLASSNONE)
+        if (hdr_info.EI_Class == ELFCLASSNONE || (hdr_info.EI_Class != ELFCLASS32 && hdr_info.EI_Class != ELFCLASS64))
         {
                 return ELF_BAD_CLASS;
         }
         
         CTX(ctx)->Endianness = (EiData)hdr_info.EI_Data;
-        if (CTX(ctx)->Endianness == ELFDATANONE)
+        if (hdr_info.EI_Data == ELFDATANONE || (hdr_info.EI_Data != ELFDATA2LSB && hdr_info.EI_Data != ELFDATA2MSB))
         {
                 return ELF_BAD_ENDIANNESS;
         }
+
+        CTX(ctx)->Hdr.EI_OS_ABI = (ElfABI)hdr_info.EI_OS_ABI;
+        CTX(ctx)->Hdr.EI_ABI_Version = hdr_info.EI_ABI_Version;
 
         /* Parse header fields to cache values for future library calls */
         if (CTX(ctx)->Class == ELFCLASS32)
@@ -142,11 +146,18 @@ ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *ctx)
         }
         if (!res)
         {
+                CTX(ctx)->Hdr.Type    = read_16(&((Elf32Header *)header_buff)->e_type,    CTX(ctx)->Endianness);
+                CTX(ctx)->Hdr.Machine = read_16(&((Elf32Header *)header_buff)->e_machine, CTX(ctx)->Endianness);
+                CTX(ctx)->Hdr.Version = read_32(&((Elf32Header *)header_buff)->e_version, CTX(ctx)->Endianness);
+
+                if (CTX(ctx)->Hdr.Version != EV_CURRENT)
+                {
+                        return ELF_BAD_VERSION;
+                }
+
                 if (CTX(ctx)->Class == ELFCLASS32)
                 {
-                        CTX(ctx)->Hdr.Type        =           read_16(&((Elf32Header *)header_buff)->e_type,      CTX(ctx)->Endianness);
-                        CTX(ctx)->Hdr.Machine     =           read_16(&((Elf32Header *)header_buff)->e_machine,   CTX(ctx)->Endianness);
-                        CTX(ctx)->Hdr.Version     = (uint32_t)read_16(&((Elf32Header *)header_buff)->e_version,   CTX(ctx)->Endianness);
+
                         CTX(ctx)->Hdr.Entry       = (uint64_t)read_32(&((Elf32Header *)header_buff)->e_entry,     CTX(ctx)->Endianness);
                         CTX(ctx)->Hdr.ProHeadOff  = (uint64_t)read_32(&((Elf32Header *)header_buff)->e_phoff,     CTX(ctx)->Endianness);
                         CTX(ctx)->Hdr.SecHeadOff  = (uint64_t)read_32(&((Elf32Header *)header_buff)->e_shoff,     CTX(ctx)->Endianness);
@@ -156,14 +167,28 @@ ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *ctx)
                         CTX(ctx)->Hdr.SHEntrySize =           read_16(&((Elf32Header *)header_buff)->e_shentsize, CTX(ctx)->Endianness);
                         CTX(ctx)->Hdr.SHEntryNum  =           read_16(&((Elf32Header *)header_buff)->e_shnum,     CTX(ctx)->Endianness);
                         CTX(ctx)->Hdr.SecStrIndx  =           read_16(&((Elf32Header *)header_buff)->e_shstrndx,  CTX(ctx)->Endianness);
-                        //TODO: simple header validation (version and size)
-                        //TODO: detect special indexes and get the proper values for the fields.
+
+                        if (CTX(ctx)->Hdr.HeadSize != sizeof(Elf32Header))
+                        {
+                                return ELF_BAD_SIZE;
+                        }
+
+                        if (CTX(ctx)->Hdr.PHEntryNum &&
+                            CTX(ctx)->Hdr.PHEntrySize != sizeof(Elf32ProHeader))
+                        {
+
+                                return ELF_BAD_SIZE;
+                        }
+
+                        if (CTX(ctx)->Hdr.SHEntryNum &&
+                            CTX(ctx)->Hdr.SHEntrySize != sizeof(Elf32SecHeader))
+                        {
+
+                                return ELF_BAD_SIZE;
+                        }
                 }
                 else // 64 bit
                 {
-                        CTX(ctx)->Hdr.Type        = read_16(&((Elf64Header *)header_buff)->e_type,      CTX(ctx)->Endianness);
-                        CTX(ctx)->Hdr.Machine     = read_16(&((Elf64Header *)header_buff)->e_machine,   CTX(ctx)->Endianness);
-                        CTX(ctx)->Hdr.Version     = read_32(&((Elf64Header *)header_buff)->e_version,   CTX(ctx)->Endianness);
                         CTX(ctx)->Hdr.Entry       = read_64(&((Elf64Header *)header_buff)->e_entry,     CTX(ctx)->Endianness);
                         CTX(ctx)->Hdr.ProHeadOff  = read_64(&((Elf64Header *)header_buff)->e_phoff,     CTX(ctx)->Endianness);
                         CTX(ctx)->Hdr.SecHeadOff  = read_64(&((Elf64Header *)header_buff)->e_shoff,     CTX(ctx)->Endianness);
@@ -173,8 +198,61 @@ ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *ctx)
                         CTX(ctx)->Hdr.SHEntrySize = read_16(&((Elf64Header *)header_buff)->e_shentsize, CTX(ctx)->Endianness);
                         CTX(ctx)->Hdr.SHEntryNum  = read_16(&((Elf64Header *)header_buff)->e_shnum,     CTX(ctx)->Endianness);
                         CTX(ctx)->Hdr.SecStrIndx  = read_16(&((Elf64Header *)header_buff)->e_shstrndx,  CTX(ctx)->Endianness);
-                        //TODO: simple header validation (version and size)
-                        //TODO: detect special indexes and get the proper values for the fields.
+
+                        if (CTX(ctx)->Hdr.HeadSize != sizeof(Elf64Header))
+                        {
+                                return ELF_BAD_SIZE;
+                        }
+                        
+                        if (CTX(ctx)->Hdr.PHEntryNum &&
+                            CTX(ctx)->Hdr.PHEntrySize != sizeof(Elf64ProHeader))
+                        {
+
+                                return ELF_BAD_SIZE;
+                        }
+
+                        if (CTX(ctx)->Hdr.SHEntryNum &&
+                            CTX(ctx)->Hdr.SHEntrySize != sizeof(Elf64SecHeader))
+                        {
+
+                                return ELF_BAD_SIZE;
+                        }
+                }
+
+                if (CTX(ctx)->Hdr.PHEntryNum != 0 && CTX(ctx)->Hdr.ProHeadOff == 0){
+                        return ELF_BAD_HEADER;
+                }
+                if (CTX(ctx)->Hdr.SHEntryNum != 0 && CTX(ctx)->Hdr.SecHeadOff == 0){
+                        return ELF_BAD_HEADER;
+                }
+
+                /* detect special indexes and get the proper values for the fields. */
+                if (CTX(ctx)->Hdr.SHEntryNum == SHN_UNDEF || CTX(ctx)->Hdr.SecStrIndx == SHN_XINDEX)
+                {
+                        if (CTX(ctx)->Hdr.SecHeadOff == 0)
+                        {
+                                return ELF_BAD_HEADER;
+                        }
+                        res = get_section_header(ctx, 0, &null_sec);
+                        if (res)
+                        {
+                                return res;
+                        }
+
+                        if (null_sec.Type != SHT_NULL)
+                        {
+                                return ELF_BAD_FORMAT;
+                        }
+
+                        if (CTX(ctx)->Hdr.SHEntryNum == SHN_UNDEF)
+                        {
+                                CTX(ctx)->Hdr.SHEntryNum = null_sec.Size;
+                        }
+
+                        if (CTX(ctx)->Hdr.SecStrIndx == SHN_XINDEX)
+                        {
+                                CTX(ctx)->Hdr.SecStrIndx = null_sec.Link;
+                        }
                 }
         }
 
