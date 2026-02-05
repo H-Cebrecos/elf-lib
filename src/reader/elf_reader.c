@@ -233,6 +233,7 @@ ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *ctx)
                         {
                                 return ELF_BAD_HEADER;
                         }
+
                         res = get_section_header(ctx, 0, &null_sec);
                         if (res)
                         {
@@ -309,49 +310,107 @@ ElfResult get_section_header(const ElfCtx *ctx, uint32_t idx, ElfSecHeader *sec_
         uint8_t sec_head_buff[sizeof(Elf64SecHeader)] = {0};
 
         if (validate_ctx(ctx))
-                return ELF_UNINIT;
-
-        if (idx >= CTX(ctx)->SHEntryNum)
-                return ELF_BAD_ARG;
-
-        if (CTX(ctx)->Class == CLASS_32)
         {
-                res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, (CTX(ctx)->SecHeadOff) + idx * (CTX(ctx)->SHEntrySize), sizeof(Elf32SecHeader), sec_head_buff);
+                return ELF_UNINIT;
+        }
+
+        if (sec_header == NULL)
+        {
+                return ELF_BAD_ARG;
+        }
+
+        if (idx >= CTX(ctx)->Hdr.SHEntryNum
+        || CTX(ctx)->Hdr.SHEntryNum == 0)
+        {
+                return ELF_BAD_INDX;
+        }
+
+        if (CTX(ctx)->Class == ELFCLASS32)
+        {
+                res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, (CTX(ctx)->Hdr.SecHeadOff) + idx * (CTX(ctx)->Hdr.SHEntrySize), sizeof(Elf32SecHeader), sec_head_buff);
         }
         else
         {
-                res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, (CTX(ctx)->SecHeadOff) + idx * (CTX(ctx)->SHEntrySize), sizeof(Elf64SecHeader), sec_head_buff);
+                res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, (CTX(ctx)->Hdr.SecHeadOff) + idx * (CTX(ctx)->Hdr.SHEntrySize), sizeof(Elf64SecHeader), sec_head_buff);
         }
         if(!res)
         {
-                sec_header->NameIdx = read_32(&(((Elf64SecHeader *)sec_head_buff)->NameIdx), CTX(ctx)->Endianness);
-                sec_header->Type    = read_32(&(((Elf64SecHeader *)sec_head_buff)->Type),    CTX(ctx)->Endianness);
-
-                if (sec_header->Type > SECTION_OTHER)
-                        sec_header->Type = SECTION_OTHER;
+                sec_header->NameIdx = read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_name), CTX(ctx)->Endianness);
+                sec_header->Type    = read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_type), CTX(ctx)->Endianness);
                 
-                if (CTX(ctx)->Class == CLASS_32)
+                if (CTX(ctx)->Class == ELFCLASS32)
                 {
-                        sec_header->Flags   = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->Flags),   CTX(ctx)->Endianness);
-                        sec_header->Address = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->Address), CTX(ctx)->Endianness);
-                        sec_header->Offset  = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->Offset),  CTX(ctx)->Endianness);
-                        sec_header->Size    = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->Size),    CTX(ctx)->Endianness);
-                        sec_header->Link    = read_32(&(((Elf32SecHeader *)sec_head_buff)->Link),    CTX(ctx)->Endianness);
-                        sec_header->Info    = read_32(&(((Elf32SecHeader *)sec_head_buff)->Info),    CTX(ctx)->Endianness);
-                        sec_header->Alignment = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->Alignment), CTX(ctx)->Endianness);
-                        sec_header->EntrySize = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->EntrySize), CTX(ctx)->Endianness);
+                        sec_header->Flags     = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_flags),     CTX(ctx)->Endianness);
+                        sec_header->Address   = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_addr),      CTX(ctx)->Endianness);
+                        sec_header->Offset    = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_offset),    CTX(ctx)->Endianness);
+                        sec_header->Size      = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_size),      CTX(ctx)->Endianness);
+                        sec_header->Link      =            read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_link),      CTX(ctx)->Endianness);
+                        sec_header->Info      =            read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_info),      CTX(ctx)->Endianness);
+                        sec_header->Alignment = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_addralign), CTX(ctx)->Endianness);
+                        sec_header->EntrySize = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_entsize),   CTX(ctx)->Endianness);
+                
+                        /* Perform validation based on section type */
+                        if ((sec_header->Type == SHT_RELA) && (sec_header->EntrySize != sizeof(Elf32Rela)))
+                        {
+                                return ELF_BAD_SIZE;
+                        }
+                        if ((sec_header->Type == SHT_REL) && (sec_header->EntrySize != sizeof(Elf32Rel)))
+                        {
+                                return ELF_BAD_SIZE;
+                        }
+                        if ((sec_header->Type == SHT_RELR) && (sec_header->EntrySize != sizeof(Elf32Relr)))
+                        {
+                                return ELF_BAD_SIZE;
+                        }
+                        if ((sec_header->Type == SHT_DYNSYM || sec_header->Type == SHT_SYMTAB) 
+                        && (sec_header->EntrySize != sizeof(Elf32SymEntry)))
+                        {
+                                return ELF_BAD_SIZE;
+                        }
                 }
                 else // 64 bit
                 {
-                        sec_header->Flags   = read_64(&(((Elf64SecHeader *)sec_head_buff)->Flags),   CTX(ctx)->Endianness);
-                        sec_header->Address = read_64(&(((Elf64SecHeader *)sec_head_buff)->Address), CTX(ctx)->Endianness);
-                        sec_header->Offset  = read_64(&(((Elf64SecHeader *)sec_head_buff)->Offset),  CTX(ctx)->Endianness);
-                        sec_header->Size    = read_64(&(((Elf64SecHeader *)sec_head_buff)->Size),    CTX(ctx)->Endianness);
-                        sec_header->Link    = read_32(&(((Elf64SecHeader *)sec_head_buff)->Link),    CTX(ctx)->Endianness);
-                        sec_header->Info    = read_32(&(((Elf64SecHeader *)sec_head_buff)->Info),    CTX(ctx)->Endianness);
-                        sec_header->Alignment = read_64(&(((Elf64SecHeader *)sec_head_buff)->Alignment), CTX(ctx)->Endianness);
-                        sec_header->EntrySize = read_64(&(((Elf64SecHeader *)sec_head_buff)->EntrySize), CTX(ctx)->Endianness);
+                        sec_header->Flags     = read_64(&(((Elf64SecHeader *)sec_head_buff)->sh_flags),     CTX(ctx)->Endianness);
+                        sec_header->Address   = read_64(&(((Elf64SecHeader *)sec_head_buff)->sh_addr),      CTX(ctx)->Endianness);
+                        sec_header->Offset    = read_64(&(((Elf64SecHeader *)sec_head_buff)->sh_offset),    CTX(ctx)->Endianness);
+                        sec_header->Size      = read_64(&(((Elf64SecHeader *)sec_head_buff)->sh_size),      CTX(ctx)->Endianness);
+                        sec_header->Link      = read_32(&(((Elf64SecHeader *)sec_head_buff)->sh_link),      CTX(ctx)->Endianness);
+                        sec_header->Info      = read_32(&(((Elf64SecHeader *)sec_head_buff)->sh_info),      CTX(ctx)->Endianness);
+                        sec_header->Alignment = read_64(&(((Elf64SecHeader *)sec_head_buff)->sh_addralign), CTX(ctx)->Endianness);
+                        sec_header->EntrySize = read_64(&(((Elf64SecHeader *)sec_head_buff)->sh_entsize),   CTX(ctx)->Endianness);
+                
+                        /* Perform validation based on section type */
+                        if ((sec_header->Type == SHT_RELA) && (sec_header->EntrySize != sizeof(Elf64Rela)))
+                        {
+                                return ELF_BAD_SIZE;
+                        }
+                        if ((sec_header->Type == SHT_REL) && (sec_header->EntrySize != sizeof(Elf64Rel)))
+                        {
+                                return ELF_BAD_SIZE;
+                        }
+                        if ((sec_header->Type == SHT_RELR) && (sec_header->EntrySize != sizeof(Elf64Relr)))
+                        {
+                                return ELF_BAD_SIZE;
+                        }
+                        if ((sec_header->Type == SHT_DYNSYM || sec_header->Type == SHT_SYMTAB) 
+                        && (sec_header->EntrySize != sizeof(Elf64SymEntry)))
+                        {
+                                return ELF_BAD_SIZE;
+                        }
                 }
+                
+                if (((sec_header->Flags & SHF_COMPRESSED) && (sec_header->Flags & SHF_ALLOC))
+                 || ((sec_header->Flags & SHF_COMPRESSED) &&  (sec_header->Type == SHT_NOBITS)))
+                {
+                        return ELF_BAD_FORMAT;
+                }
+
+                if (sec_header->Type == SHT_GROUP && CTX(ctx)->Hdr.Type != ET_REL)
+                {
+                        return ELF_BAD_FORMAT;
+                        //NOTE: This implementation does not check that a group section appears before the other sections in the group.
+                }
+                //NOTE: This implementation does not check that a SYMTAB_SHNDX is pressent if a symbol tables contains an SHN_XINDEX entry.
         }
 
         return res;
@@ -365,10 +424,14 @@ static ElfResult internal_get_str_from_offset(const ElfCtx *ctx, uint64_t offset
         while (i < (len)) {
                 ElfResult res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, offset + i, 1, &buff[i]);
                 if (res)
+                {
                         return res;
+                }
 
                 if (buff[i] == '\0')
+                {
                         break;
+                }
 
                 i++;
         }
@@ -386,14 +449,20 @@ ElfResult get_section_name(const ElfCtx *ctx, const ElfSecHeader *sec_header, ui
         ElfResult res = ELF_OK; 
 
         if (validate_ctx(ctx))
+        {
                 return ELF_UNINIT;
+        }
 
         if ((sec_header == NULL) || (buff == NULL) || (len == 0))
+        {
                 return ELF_BAD_ARG;
+        }
 
-        res = get_section_header(ctx, CTX(ctx)->SecNameStrIndx, &str_sec_hdr);
+        res = get_section_header(ctx, CTX(ctx)->Hdr.SecStrIndx, &str_sec_hdr);
         if (res)
+        {
                 return res;
+        }
 
         uint64_t offset = str_sec_hdr.Offset + sec_header->NameIdx;
         return internal_get_str_from_offset(ctx, offset, buff, len);
@@ -407,7 +476,9 @@ ElfResult get_section_by_name(const ElfCtx *ctx, const uint8_t *name, ElfSecHead
         uint32_t sec_cnt = get_section_count(ctx);
 
         if ((name == NULL) || (sec_cnt == 0))
+        {
                 return ELF_BAD_ARG;
+        }
         
         // Skip NULL section
         for (uint32_t i = 1; i < sec_cnt; i++)
@@ -415,22 +486,30 @@ ElfResult get_section_by_name(const ElfCtx *ctx, const uint8_t *name, ElfSecHead
                 // already checks that sec is valid
                 ElfResult res = get_section_header(ctx, i, sec);
                 if (res != ELF_OK)
+                {
                         return res;
+                }
 
                 res = get_section_name(ctx, sec, sec_name, sizeof(sec_name));
                 if (res != ELF_OK)
+                {
                         return res;
+                }
 
                 for (uint16_t j = 0; j < 256; j++)
                 {
 
                         if (name[j] != sec_name[j])
+                        {
                                 break;
+                        }
 
                         // equality already considered in the previous check
                         if ((name[j] == '\0'))
+                        {
                                 return ELF_OK;
                 }
+        }
         }
         return ELF_NOT_FOUND;
 }
