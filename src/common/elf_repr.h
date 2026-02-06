@@ -200,6 +200,31 @@
 
 
 
+typedef struct
+{
+        /* data */
+}Elf32Rela;
+typedef struct
+{
+        /* data */
+}Elf64Rela;
+
+typedef struct
+{
+        /* data */
+}Elf32Rel;
+typedef struct
+{
+        /* data */
+}Elf64Rel;
+typedef struct
+{
+        /* data */
+}Elf32Relr;
+typedef struct
+{
+        /* data */
+}Elf64Relr;
 
 
 
@@ -227,26 +252,6 @@ typedef struct
         uint64_t MemSize;    // Size of the segment in the memory image
         uint64_t Alignment;  // Alignment constraints of Address fields
 } Elf64ProHeader;
-
-typedef struct
-{
-        uint32_t NameIdx;      // Index into the related string table
-        uint32_t Value;        // Value (Address) of the symbol
-        uint32_t Size;         // Size of the object referenced by the symbol
-        uint8_t  info;
-        uint8_t  reserved;
-        uint16_t SecIdx;
-} Elf32SymEntry;
-
-typedef struct
-{
-        uint32_t NameIdx;      // Index into the related string table
-        uint8_t  info;
-        uint8_t  reserved;
-        uint16_t SecIdx;
-        uint64_t Value;        // Value (Address) of the symbol
-        uint64_t Size;         // Size of the object referenced by the symbol
-} Elf64SymEntry;
 
 
 #endif // Include guard;

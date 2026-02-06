@@ -96,7 +96,6 @@ typedef struct
         {
                 EiClass EI_Class;       // 32 or 64 bit architecture
                 EiData  EI_Data;        // Endianness of the architecture
-                uint8_t EI_Version;     // Always 1
                 ElfABI  EI_OS_ABI;      // Target Platform's ABI
                 uint8_t EI_ABI_Version; // Target ABI Version
                 uint8_t Pad[7];
@@ -291,6 +290,9 @@ typedef enum ElfResult
         ELF_BAD_VERSION,
         ELF_BAD_CLASS,
         ELF_BAD_ENDIANNESS,
+        ELF_BAD_SIZE,
+        ELF_BAD_HEADER,
+        ELF_BAD_FORMAT,
         ELF_BAD_ARG,            // usually a NULL pointer
         ELF_BAD_INDX,           // index would overflow the selected table
         ELF_NOT_FOUND,
@@ -308,7 +310,7 @@ typedef ElfResult (*elf_read_callback)(
     void *user_ctx,  // user-provided context (file handle, pointer, etc.)
     uint64_t offset, // absolute offset in the "file"
     uint64_t size,     // number of bytes requested
-    uint8_t *buffer     // destination buffer (already allocated by caller a.k.a the library)
+    void *buffer     // destination buffer (already allocated by caller a.k.a the library)
 );
 
 /**

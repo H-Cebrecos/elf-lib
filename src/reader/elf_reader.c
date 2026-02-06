@@ -91,7 +91,7 @@ ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *ctx)
         CTX(ctx)->initialized = false;
 
         /* Initialize base fields of the context */
-        if ((callback == NULL))
+        if (callback == NULL)
         {
                 return ELF_BAD_ARG;
         }
@@ -100,7 +100,7 @@ ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *ctx)
         CTX(ctx)->UserCtx = user_ctx;
 
         /* Parse identification header */
-        res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, 0, sizeof(hdr_info), &hdr_info);
+        res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, 0, sizeof(hdr_info), (void *)&hdr_info);
         if (res)
         {
                 return res;
@@ -112,7 +112,7 @@ ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *ctx)
          || hdr_info.Magic[2] != 'L'
          || hdr_info.Magic[3] != 'F')
         {
-                return ELF_BAD_MAGIC;
+               return ELF_BAD_MAGIC;
         }
 
         if (hdr_info.EI_Version != EV_CURRENT)
@@ -337,7 +337,7 @@ ElfResult get_section_header(const ElfCtx *ctx, uint32_t idx, ElfSecHeader *sec_
         {
                 sec_header->NameIdx = read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_name), CTX(ctx)->Endianness);
                 sec_header->Type    = read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_type), CTX(ctx)->Endianness);
-                
+
                 if (CTX(ctx)->Class == ELFCLASS32)
                 {
                         sec_header->Flags     = (uint64_t) read_32(&(((Elf32SecHeader *)sec_head_buff)->sh_flags),     CTX(ctx)->Endianness);
@@ -508,11 +508,15 @@ ElfResult get_section_by_name(const ElfCtx *ctx, const uint8_t *name, ElfSecHead
                         if ((name[j] == '\0'))
                         {
                                 return ELF_OK;
+                        }
                 }
-        }
         }
         return ELF_NOT_FOUND;
 }
+
+//TODO: get_compression_header(section);
+
+//TODO: from this point.
 
 ElfResult get_program_header(const ElfCtx *ctx, uint32_t idx, ElfProHeader *prog_header)
 {
@@ -522,23 +526,23 @@ ElfResult get_program_header(const ElfCtx *ctx, uint32_t idx, ElfProHeader *prog
         if (validate_ctx(ctx))
                 return ELF_UNINIT;
 
-        if (idx >= CTX(ctx)->PHEntryNum)
+        if (idx >= CTX(ctx)->Hdr.PHEntryNum)
                 return ELF_BAD_ARG;
 
 
-        if (CTX(ctx)->Class == CLASS_32)
+        if (CTX(ctx)->Class == ELFCLASS32)
         {
-                res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, (CTX(ctx)->ProHeadOff) + idx * (CTX(ctx)->PHEntrySize), sizeof(Elf32SecHeader), prog_head_buff);
+                res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, (CTX(ctx)->Hdr.ProHeadOff) + idx * (CTX(ctx)->Hdr.PHEntrySize), sizeof(Elf32SecHeader), prog_head_buff);
         }
         else
         {
-                res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, (CTX(ctx)->ProHeadOff) + idx * (CTX(ctx)->PHEntrySize), sizeof(Elf64SecHeader), prog_head_buff);
+                res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, (CTX(ctx)->Hdr.ProHeadOff) + idx * (CTX(ctx)->Hdr.PHEntrySize), sizeof(Elf64SecHeader), prog_head_buff);
         }
         if(!res)
         {
                 prog_header->Type    = read_32(&(((Elf64ProHeader *)prog_head_buff)->Type),    CTX(ctx)->Endianness);
                 
-                if (CTX(ctx)->Class == CLASS_32)
+                if (CTX(ctx)->Class == ELFCLASS32)
                 {
                         prog_header->Flags      = read_32(&(((Elf32ProHeader *)prog_head_buff)->Flags),      CTX(ctx)->Endianness);
                         prog_header->Offset     = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->Offset),     CTX(ctx)->Endianness);
@@ -587,7 +591,7 @@ ElfResult get_symbol_entry(const ElfCtx *ctx, const ElfSecHeader *sym_tab, uint3
         if((sym_tab == NULL)||(sym == NULL))
                 return ELF_BAD_ARG;
 
-        if (CTX(ctx)->Class == CLASS_32)
+        if (CTX(ctx)->Class == ELFCLASS32)
         {
                 res = CTX(ctx)->Callback(CTX(ctx)->UserCtx, (sym_tab->Offset) + idx * (sym_tab->EntrySize), sizeof(Elf32SymEntry), sym_buff);
         }
@@ -597,23 +601,23 @@ ElfResult get_symbol_entry(const ElfCtx *ctx, const ElfSecHeader *sym_tab, uint3
         }
         if(!res)
         {
-                sym->NameIdx = read_32(&(((Elf64SymEntry *)sym_buff)->NameIdx), CTX(ctx)->Endianness);
+                sym->NameIdx = read_32(&(((Elf64SymEntry *)sym_buff)->st_name), CTX(ctx)->Endianness);
                 
-                if (CTX(ctx)->Class == CLASS_32)
+                if (CTX(ctx)->Class == ELFCLASS32)
                 {
-                        sym->Type    = (((Elf32SymEntry *)sym_buff)->SecIdx) & 0x0F;
-                        sym->Binding = (((Elf32SymEntry *)sym_buff)->SecIdx) >> 4;
-                        sym->SecIdx  = read_16(&(((Elf32SymEntry *)sym_buff)->SecIdx), CTX(ctx)->Endianness);
-                        sym->Value   = (uint64_t) read_32(&(((Elf32SymEntry *)sym_buff)->Value), CTX(ctx)->Endianness);
-                        sym->Size    = (uint64_t) read_32(&(((Elf32SymEntry *)sym_buff)->Size),  CTX(ctx)->Endianness);
+                        sym->Type    = (((Elf32SymEntry *)sym_buff)->st_info) & 0x0F;
+                        sym->Binding = (((Elf32SymEntry *)sym_buff)->st_info) >> 4;
+                        sym->SecIdx  = read_16(&(((Elf32SymEntry *)sym_buff)->st_shndx), CTX(ctx)->Endianness);
+                        sym->Value   = (uint64_t) read_32(&(((Elf32SymEntry *)sym_buff)->st_value), CTX(ctx)->Endianness);
+                        sym->Size    = (uint64_t) read_32(&(((Elf32SymEntry *)sym_buff)->st_size),  CTX(ctx)->Endianness);
                 }
                 else // 64 bit
                 {
-                        sym->Type    = (((Elf64SymEntry *)sym_buff)->SecIdx) & 0x0F;
-                        sym->Binding = (((Elf64SymEntry *)sym_buff)->SecIdx) >> 4;
-                        sym->SecIdx  = read_16(&(((Elf64SymEntry *)sym_buff)->SecIdx), CTX(ctx)->Endianness);
-                        sym->Value   = read_64(&(((Elf64SymEntry *)sym_buff)->Value),  CTX(ctx)->Endianness);
-                        sym->Size    = read_64(&(((Elf64SymEntry *)sym_buff)->Size),   CTX(ctx)->Endianness);
+                        sym->Type    = (((Elf64SymEntry *)sym_buff)->st_info) & 0x0F;
+                        sym->Binding = (((Elf64SymEntry *)sym_buff)->st_info) >> 4;
+                        sym->SecIdx  = read_16(&(((Elf64SymEntry *)sym_buff)->st_shndx), CTX(ctx)->Endianness);
+                        sym->Value   = read_64(&(((Elf64SymEntry *)sym_buff)->st_value),  CTX(ctx)->Endianness);
+                        sym->Size    = read_64(&(((Elf64SymEntry *)sym_buff)->st_size),   CTX(ctx)->Endianness);
                 }       
         }
 
@@ -649,7 +653,7 @@ ElfResult get_symbol_by_addr_exact( const ElfCtx *ctx, const ElfSecHeader *sym_t
                 if (sym->SecIdx == SHN_UNDEF)
                         continue;
                 // Only consider function and object symbols
-                if ((sym->Type != SYM_FUNC) && (sym->Type != SYM_OBJECT))
+                if ((sym->Type != STT_FUNC) && (sym->Type != STT_OBJECT))
                         continue;
 
                 if (sym->Value == addr)
@@ -732,7 +736,7 @@ ElfResult get_str_from_table(const ElfCtx *ctx, uint32_t sec_idx, uint32_t str_i
         if(res)
                 return res;
 
-        if((str_tab.Type != SECTION_STRTAB) || (str_tab.Size <= str_idx) || (buff == NULL) || (len == 0))
+        if((str_tab.Type != SHT_STRTAB) || (str_tab.Size <= str_idx) || (buff == NULL) || (len == 0))
                 return ELF_BAD_ARG;
         
         uint64_t offset = str_tab.Offset + str_idx;

@@ -40,3 +40,8 @@ This modularity allows Elf-lib to be used in both highly constrained environment
 ---
 
 Elf-lib is aimed at developers who want practical, lightweight ELF support without the overhead of large, production-grade libraries.
+
+## Platform support
+ELF files are inherently platform dependant and each platform defines their own psABI for the architecture and OS specific extensions. This library does not attempt to support every platform or even the common ones.
+Elf is designed so that extensions are basically special numbers in certain fields, the library always provides a way to read those fields directly so you can implement that logic directly without modifiying the library.
+The library is also designed to be easily modifyable with those extensions if you prefer to edit this code and keep the elf logic more contained.
