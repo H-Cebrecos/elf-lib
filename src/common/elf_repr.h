@@ -178,6 +178,12 @@
                 STN_UNDEF = 0,
         }SymbIndx;
 
+        #define ELF32_ST_BIND(i)        ((i) >> 4)
+        #define ELF32_ST_TYPE(i)        ((i)& 0xf)
+        #define ELF32_ST_INFO(b, t)     (((b)<<4)+((t)&0xf)) //used for generating the st_info field
+
+        #define ELF32_ST_VISIBILITY(o)  ((o)& 0x7)
+        #define ELF64_ST_VISIBILITY(o)  ((o)& 0x7)
 
         typedef struct {
                 uint32_t st_name;       // Index into the related string table
@@ -197,34 +203,34 @@
                 uint16_t st_size;       // Size of the object referenced by the symbol
         }Elf64SymEntry;
 
-
-
-
-typedef struct
-{
-        /* data */
-}Elf32Rela;
-typedef struct
-{
-        /* data */
-}Elf64Rela;
-
-typedef struct
-{
-        /* data */
-}Elf32Rel;
-typedef struct
-{
-        /* data */
-}Elf64Rel;
-typedef struct
-{
-        /* data */
-}Elf32Relr;
-typedef struct
-{
-        /* data */
-}Elf64Relr;
+/***************
+ * Relocations *
+ ***************/
+        typedef struct
+        {
+                /* data */
+        }Elf32Rela;
+        typedef struct
+        {
+                /* data */
+        }Elf64Rela;
+        
+        typedef struct
+        {
+                /* data */
+        }Elf32Rel;
+        typedef struct
+        {
+                /* data */
+        }Elf64Rel;
+        typedef struct
+        {
+                /* data */
+        }Elf32Relr;
+        typedef struct
+        {
+                /* data */
+        }Elf64Relr;
 
 
 

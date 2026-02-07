@@ -192,34 +192,6 @@ typedef struct
                 uint64_t EntrySize; // If the section is a table of fixed-size entries this is the entry size
         } ElfSecHeader;
 
-/****************
- *   Segments   *
- ****************/         
-        typedef enum ElfSegmentType
-        {
-                SEGMENT_NULL = 0,
-                SEGMENT_LOAD = 1,
-                SEGMENT_DYNAMIC = 2,
-                SEGMENT_INTERP  = 3,
-                SEGMENT_NOTE  = 4,
-                SEGMENT_SHLIB = 5,
-                SEGMENT_PHDR  = 6,
-        } ElfSegmentType;
-
-
-
-        typedef struct
-        {
-                ElfSegmentType Type; // Type of segment
-                uint32_t Flags;      
-                uint64_t Offset;     // Section is stored at <offset> from the begining of this file
-                uint64_t PhyAddress; // Physical address, only relevant on some systems
-                uint64_t VirAddress; // Virtual address of this segment in memory
-                uint64_t FileSize;   // Size of the segment in this file
-                uint64_t MemSize;    // Size of the segment in the memory image
-                uint64_t Alignment;  // Alignment constraints of Address fields
-        } ElfProHeader;
-
 /***************
  *   Symbols   *
  ***************/
@@ -265,16 +237,63 @@ typedef struct
                 STV_ELIMINATE = 6,
         }ElfSymbolVis;
         
+        /**
+         * This enum is not part of the standard, 
+         * it's a helper that abstracts the logic of
+         * determining these special conditions.
+         */
+        typedef enum ElfSymbolAttr
+        {
+                STA_DEFAULT, // No special semantics SecIdx points to the related section.
+                STA_ABS,     // Symbol is absolute it's value will not change with relocation, SecIdx is not used
+                STA_COMMON,  // Symbol is an unallocated common symbol, Value indicates aligment and Size the required size.
+                STA_UNDEF,   // Symbol is undefined. see spec
+                STA_UNKNOWN, // The value that was found is a special value unknown to this implementation, the oringinal value
+                             // is preserved in the SecIdx field, refer to your psABI or OS specific ABI for more details.
+        }ElfSymbolAttr;
+
         typedef struct
         {
-                uint32_t NameIdx;      // Index into the related string table
-                ElfSymbolType Type;    // Type of data represented by the symbol
-                ElfSymbolBind Binding; // Binding atributes of the symbol
-                uint16_t SecIdx;       // Section table index //TODO: better expl
-                uint64_t Value;        // Value (Address) of the symbol
-                uint64_t Size;         // Size of the object referenced by the symbol
+                uint32_t NameIdx;      // Index into the associated string table (0 = empty name)
+                ElfSymbolType Type;    // Kind of symbol (function, object, section, file, etc.)
+                ElfSymbolBind Binding; // Linkage and visibility across object files
+                ElfSymbolVis  Visib;   // Runtime visibility (default, hidden, protected)
+                ElfSymbolAttr Attr;    // High-level classification (normal, abs, common, undef, unknown)
+                uint64_t SecIdx;       // Section index to which this symbol applies, or special value, see Attr.
+                uint64_t Value;        // Address, offset, or alignment depending on Attr and Type
+                uint64_t Size;         // Size of the referenced entity (bytes or required allocation)
         } ElfSymTabEntry;
-        
+
+    
+/****************
+ *   Segments   *
+ ****************/         
+        typedef enum ElfSegmentType
+        {
+                SEGMENT_NULL = 0,
+                SEGMENT_LOAD = 1,
+                SEGMENT_DYNAMIC = 2,
+                SEGMENT_INTERP  = 3,
+                SEGMENT_NOTE  = 4,
+                SEGMENT_SHLIB = 5,
+                SEGMENT_PHDR  = 6,
+        } ElfSegmentType;
+
+
+
+        typedef struct
+        {
+                ElfSegmentType Type; // Type of segment
+                uint32_t Flags;      
+                uint64_t Offset;     // Section is stored at <offset> from the begining of this file
+                uint64_t PhyAddress; // Physical address, only relevant on some systems
+                uint64_t VirAddress; // Virtual address of this segment in memory
+                uint64_t FileSize;   // Size of the segment in this file
+                uint64_t MemSize;    // Size of the segment in the memory image
+                uint64_t Alignment;  // Alignment constraints of Address fields
+        } ElfProHeader;
+
+    
 /**
  * @brief Return codes for ELF library functions.
  *
@@ -293,6 +312,7 @@ typedef enum ElfResult
         ELF_BAD_SIZE,
         ELF_BAD_HEADER,
         ELF_BAD_FORMAT,
+        ELF_BAD_SECTION_TYPE,
         ELF_BAD_ARG,            // usually a NULL pointer
         ELF_BAD_INDX,           // index would overflow the selected table
         ELF_NOT_FOUND,
