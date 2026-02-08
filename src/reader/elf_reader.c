@@ -571,8 +571,9 @@ ElfResult get_symbol_entry(const ElfCtx *ctx, const ElfSecHeader *sym_tab, uint3
                         sym->Value   =           read_64(&(((Elf64SymEntry *)sym_buff)->st_value), CTX(ctx)->Endianness);
                         sym->Visib   = ELF64_ST_VISIBILITY(((Elf64SymEntry *)sym_buff)->st_other);
                         sym->Size    =           read_64(&(((Elf64SymEntry *)sym_buff)->st_size),  CTX(ctx)->Endianness);
-                }       
+                }
                 
+                //TODO: any checks?
                 //TODO: handle special secIdx (SHN_XINDEX pg 30)
                 //TODO: manage my attributes implementation
         }
@@ -704,28 +705,31 @@ ElfResult get_program_header(const ElfCtx *ctx, uint32_t idx, ElfProHeader *prog
         }
         if(!res)
         {
-                prog_header->Type    = read_32(&(((Elf64ProHeader *)prog_head_buff)->Type),    CTX(ctx)->Endianness);
                 
                 if (CTX(ctx)->Class == ELFCLASS32)
                 {
-                        prog_header->Flags      = read_32(&(((Elf32ProHeader *)prog_head_buff)->Flags),      CTX(ctx)->Endianness);
-                        prog_header->Offset     = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->Offset),     CTX(ctx)->Endianness);
-                        prog_header->PhyAddress = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->PhyAddress), CTX(ctx)->Endianness);
-                        prog_header->VirAddress = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->VirAddress), CTX(ctx)->Endianness);
-                        prog_header->FileSize   = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->FileSize),   CTX(ctx)->Endianness);
-                        prog_header->MemSize    = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->MemSize),    CTX(ctx)->Endianness);
-                        prog_header->Alignment  = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->Alignment),  CTX(ctx)->Endianness);
+                        prog_header->Type       =            read_32(&(((Elf32ProHeader *)prog_head_buff)->p_type),   CTX(ctx)->Endianness);
+                        prog_header->Offset     = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->p_offset), CTX(ctx)->Endianness);
+                        prog_header->VirAddress = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->p_vaddr),  CTX(ctx)->Endianness);
+                        prog_header->PhyAddress = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->p_paddr),  CTX(ctx)->Endianness);
+                        prog_header->FileSize   = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->p_filesz), CTX(ctx)->Endianness);
+                        prog_header->MemSize    = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->p_memsz),  CTX(ctx)->Endianness);
+                        prog_header->Flags      =            read_32(&(((Elf32ProHeader *)prog_head_buff)->p_flags),  CTX(ctx)->Endianness);
+                        prog_header->Alignment  = (uint64_t) read_32(&(((Elf32ProHeader *)prog_head_buff)->p_align),  CTX(ctx)->Endianness);
                 }
                 else // 64 bit
                 {
-                        prog_header->Flags   = read_32(&(((Elf64ProHeader *)prog_head_buff)->Flags),  CTX(ctx)->Endianness);
-                        prog_header->Offset  = read_64(&(((Elf64ProHeader *)prog_head_buff)->Offset), CTX(ctx)->Endianness);
-                        prog_header->PhyAddress = read_64(&(((Elf64ProHeader *)prog_head_buff)->PhyAddress), CTX(ctx)->Endianness);
-                        prog_header->VirAddress = read_64(&(((Elf64ProHeader *)prog_head_buff)->VirAddress), CTX(ctx)->Endianness);
-                        prog_header->FileSize   = read_64(&(((Elf64ProHeader *)prog_head_buff)->FileSize),   CTX(ctx)->Endianness);
-                        prog_header->MemSize    = read_64(&(((Elf64ProHeader *)prog_head_buff)->MemSize),    CTX(ctx)->Endianness);
-                        prog_header->Alignment  = read_64(&(((Elf64ProHeader *)prog_head_buff)->Alignment),  CTX(ctx)->Endianness);
-                }       
+                        prog_header->Type       = read_32(&(((Elf64ProHeader *)prog_head_buff)->p_type),   CTX(ctx)->Endianness);
+                        prog_header->Flags      = read_32(&(((Elf64ProHeader *)prog_head_buff)->p_flags),  CTX(ctx)->Endianness);
+                        prog_header->Offset     = read_64(&(((Elf64ProHeader *)prog_head_buff)->p_offset), CTX(ctx)->Endianness);
+                        prog_header->VirAddress = read_64(&(((Elf64ProHeader *)prog_head_buff)->p_vaddr),  CTX(ctx)->Endianness);
+                        prog_header->PhyAddress = read_64(&(((Elf64ProHeader *)prog_head_buff)->p_paddr),  CTX(ctx)->Endianness);
+                        prog_header->FileSize   = read_64(&(((Elf64ProHeader *)prog_head_buff)->p_filesz), CTX(ctx)->Endianness);
+                        prog_header->MemSize    = read_64(&(((Elf64ProHeader *)prog_head_buff)->p_memsz),  CTX(ctx)->Endianness);
+                        prog_header->Alignment  = read_64(&(((Elf64ProHeader *)prog_head_buff)->p_align),  CTX(ctx)->Endianness);
+                }
+                //TODO: checks (essentially aligment check and type/permission specific checks)
+                //TODO: handle note sections. get_note(phr)?
         }
 
         return res;

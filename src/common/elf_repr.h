@@ -200,64 +200,82 @@
                 uint8_t  st_other;
                 uint16_t st_shndx;
                 uint64_t st_value;      // Value (Address) of the symbol
-                uint16_t st_size;       // Size of the object referenced by the symbol
+                uint64_t st_size;       // Size of the object referenced by the symbol
         }Elf64SymEntry;
 
 /***************
  * Relocations *
  ***************/
+
+        #define ELF32_R_SYM(i)          ((i)>>8)
+        #define ELF32_R_TYPE(i)         ((uint8_t)(i))
+        #define ELF32_R_INFO(s,t)       (((s)<<8)+(uint8_t)(t)) // Used when writting the r_info field.
+
+        #define ELF64_R_SYM(i)          ((i)>>32)
+        #define ELF64_R_TYPE(i)         ((i)&0xffffffffL)
+        #define ELF64_R_INFO(s,t)       (((s)<<32)+((t)&0xffffffffL)) // Used when writting the r_info field.
+
+         typedef struct
+        {
+                uint32_t r_offset;
+                uint32_t r_info;
+        }Elf32Rel;
+
         typedef struct
         {
-                /* data */
+                uint32_t r_offset;
+                uint32_t r_info;
+                int32_t  r_addend;        
         }Elf32Rela;
+
         typedef struct
         {
-                /* data */
-        }Elf64Rela;
+                uint64_t r_offset;
+                uint64_t r_info;
+        }Elf64Rel;
         
         typedef struct
         {
-                /* data */
-        }Elf32Rel;
+                uint64_t r_offset;
+                uint64_t r_info;
+                int64_t  r_addend;
+        }Elf64Rela;
+
+        typedef uint32_t Elf32Relr;
+        typedef uint64_t Elf64Relr;
+
+/****************
+ *   Segments   *
+ ****************/
+
         typedef struct
         {
-                /* data */
-        }Elf64Rel;
+                uint32_t p_type;        // Type of segment
+                uint32_t p_offset;      // Section is stored at <offset> from the begining of this file
+                uint32_t p_vaddr;       // Virtual address of this segment in memory
+                uint32_t p_paddr;       // Physical address, only relevant on some systems
+                uint32_t p_filesz;      // Size of the segment in this file
+                uint32_t p_memsz;       // Size of the segment in the memory image
+                uint32_t p_flags;      
+                uint32_t p_align;       // Alignment constraints of Address fields
+        } Elf32ProHeader;
+
         typedef struct
         {
-                /* data */
-        }Elf32Relr;
-        typedef struct
-        {
-                /* data */
-        }Elf64Relr;
+                uint32_t p_type;        // Type of segment
+                uint32_t p_flags;      
+                uint64_t p_offset;      // Section is stored at <offset> from the begining of this file
+                uint64_t p_vaddr;       // Virtual address of this segment in memory
+                uint64_t p_paddr;       // Physical address, only relevant on some systems
+                uint64_t p_filesz;      // Size of the segment in this file
+                uint64_t p_memsz;       // Size of the segment in the memory image
+                uint64_t p_align;       // Alignment constraints of Address fields
+        } Elf64ProHeader;
 
 
-
-
-typedef struct
-{
-        uint32_t Type; // Type of segment
-        uint32_t Offset;     // Section is stored at <offset> from the begining of this file
-        uint32_t PhyAddress; // Physical address, only relevant on some systems
-        uint32_t VirAddress; // Virtual address of this segment in memory
-        uint32_t FileSize;   // Size of the segment in this file
-        uint32_t MemSize;    // Size of the segment in the memory image
-        uint32_t Flags;      
-        uint32_t Alignment;  // Alignment constraints of Address fields
-} Elf32ProHeader;
-
-typedef struct
-{
-        uint32_t Type; // Type of segment
-        uint32_t Flags;      
-        uint64_t Offset;     // Section is stored at <offset> from the begining of this file
-        uint64_t PhyAddress; // Physical address, only relevant on some systems
-        uint64_t VirAddress; // Virtual address of this segment in memory
-        uint64_t FileSize;   // Size of the segment in this file
-        uint64_t MemSize;    // Size of the segment in the memory image
-        uint64_t Alignment;  // Alignment constraints of Address fields
-} Elf64ProHeader;
-
-
+/*************
+ *   NOTES   *
+ *************/
+        //TODO: note sections/segments
+        
 #endif // Include guard;

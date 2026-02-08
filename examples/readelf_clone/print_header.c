@@ -112,7 +112,6 @@ int main(int argc, char **argv)
     for (uint32_t i = 0; i < get_program_header_count(&ctx); i++)
     {
         ElfProHeader ph;
-        ElfProHeader ph;
         if (get_program_header(&ctx, i, &ph) != ELF_OK)
             continue;
 
@@ -158,7 +157,7 @@ int main(int argc, char **argv)
             if (get_symbol_name(&ctx, sh.Link, &sym, name, sizeof(name)) != ELF_OK)
                 strcpy((char *)name, "<err>");
 
-            printf("%5" PRIu64 ": %016" PRIx64 " %5" PRIu64 " %-8s %-8s %3u %s\n",
+            printf("%5" PRIu64 ": %016" PRIx64 " %5" PRIu64 " %-8s %-8s %3lu %s\n",
                    j,
                    sym.Value,
                    sym.Size,

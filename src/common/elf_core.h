@@ -20,6 +20,13 @@
  * SOFTWARE.
  */
 
+ //TODO: riscv example
+ /** NOTE: Most of the enums in this file are to give names to special values, the ELF standard defines ways to 
+  *        extend those lists, you may add any value your application needs to those enums without risk of breaking 
+  *        the library. This can be OK for simple "patches" in case you need a few modifications. To add full support
+  *        for a specific system or ABI it may be better to create an "extension header" as shown in the examples. 
+  */
+
 #ifndef ELF_LIB
 #define ELF_LIB
 
@@ -68,6 +75,9 @@ typedef struct
         typedef enum ElfMachine
         {
                 EM_NONE = 0,
+
+                /* You may add your application-specific machines here */
+
         } ElfMachine;
 
         typedef enum EiClass
@@ -87,6 +97,9 @@ typedef struct
         typedef enum ElfABI
         {
                 ELFOSABI_NONE = 0 // This is the default value for most linkers
+
+                /* You may add your application-specific ABIs here */
+                
         } ElfABI;
 
         /**
@@ -119,24 +132,24 @@ typedef struct
  ****************/        
         typedef enum ElfSectionType
         {
-                SHT_NULL          = 0,
-                SHT_PROGBITS      = 1,
-                SHT_SYMTAB        = 2,
-                SHT_STRTAB        = 3,
-                SHT_RELA          = 4,
-                SHT_HASH          = 5,
-                SHT_DYNAMIC       = 6,
-                SHT_NOTE          = 7,
-                SHT_NOBITS        = 8,
-                SHT_REL           = 9,
-                SHT_SHLIB         = 10,
-                SHT_DYNSYM        = 11,
-                SHT_INIT_ARRAY    = 14,
-                SHT_FINI_ARRAY    = 15,
-                SHT_PREINIT_ARRAY = 16,
-                SHT_GROUP         = 17,
-                SHT_SYMTAB_SHNDX  = 18,
-                SHT_RELR          = 19,
+                SHT_NULL                  =  0,
+                SHT_PROGBITS              =  1,
+                SHT_SYMTAB                =  2,
+                SHT_STRTAB                =  3,
+                SHT_RELA                  =  4,
+                SHT_HASH                  =  5,
+                SHT_DYNAMIC               =  6,
+                SHT_NOTE                  =  7,
+                SHT_NOBITS                =  8,
+                SHT_REL                   =  9,
+                SHT_SHLIB                 = 10,
+                SHT_DYNSYM                = 11,
+                SHT_INIT_ARRAY            = 14,
+                SHT_FINI_ARRAY            = 15,
+                SHT_PREINIT_ARRAY         = 16,
+                SHT_GROUP                 = 17,
+                SHT_SYMTAB_SHNDX          = 18,
+                SHT_RELR                  = 19,
                 SHT_LOOS          = 0x60000000,
 
                 /* You may add your application's OS-specific types here */
@@ -153,30 +166,38 @@ typedef struct
 
         typedef enum ElfSectionFlag
         {
-               SHF_WRITE            = 0x1,
-               SHF_ALLOC            = 0x2,
-               SHF_EXECINSTR        = 0x4,
-               SHF_MERGE            = 0x10,
-               SHF_STRINGS          = 0x20,
-               SHF_INFO_LINK        = 0x40,
-               SHF_LINK_ORDER       = 0x80,
-               SHF_OS_NONCONFORMING = 0x100,
-               SHF_GROUP            = 0x200,
-               SHF_TLS              = 0x400,
-               SHF_COMPRESSED       = 0x800,
+               SHF_WRITE                 =   0x1,
+               SHF_ALLOC                 =   0x2,
+               SHF_EXECINSTR             =   0x4,
+               SHF_MERGE                 =  0x10,
+               SHF_STRINGS               =  0x20,
+               SHF_INFO_LINK             =  0x40,
+               SHF_LINK_ORDER            =  0x80,
+               SHF_OS_NONCONFORMING      = 0x100,
+               SHF_GROUP                 = 0x200,
+               SHF_TLS                   = 0x400,
+               SHF_COMPRESSED            = 0x800,
                SHF_MASKOS           = 0x0ff00000,
+
                /* You may add your application's OS-specific flags here */
+
                SHF_MASKPROC         = 0xf0000000,
+
                /* You may add your application's processor-specific flags here */
+
         } ElfSectionFlag;
 
         typedef enum SecGrpFlags
         {
-                GRP_COMDAT      = 0x1,
+                GRP_COMDAT             = 0x1,
                 GRP_MASKOS      = 0x0ff00000,
+
                 /* You may add your application's OS-specific flags here */
+
                 GRP_MASKPROC    = 0xf0000000,
+
                 /* You may add your application's processor-specific flags here */
+
         }SecGrpFlags;
         typedef struct
         {
@@ -205,10 +226,14 @@ typedef struct
                 STT_COMMON  = 5,
                 STT_TLS     = 6,
                 STT_LOOS    = 10, 
+
                 /* You may add your application's OS-specific flags here */
+
                 STT_HIOS    = 12, 
                 STT_LOPROC  = 13,
+
                 /* You may add your application's processor-specific flags here */
+
                 STT_HIPROC  = 15, 
         } ElfSymbolType;
 
@@ -218,10 +243,14 @@ typedef struct
                 STB_GLOBAL = 1,  // Visible to all symbol files
                 STB_WEAK   = 2,  // Global scope, overriden by a global symbol of same name
                 STB_LOOS   = 10,
+
                 /* You may add your application's OS-specific flags here */
+
                 STB_HIOS   = 12,
                 STB_LOPROC = 13,
+
                 /* You may add your application's processor-specific flags here */
+
                 STB_HIPROC = 15,
         } ElfSymbolBind;
 
@@ -270,15 +299,40 @@ typedef struct
  ****************/         
         typedef enum ElfSegmentType
         {
-                SEGMENT_NULL = 0,
-                SEGMENT_LOAD = 1,
-                SEGMENT_DYNAMIC = 2,
-                SEGMENT_INTERP  = 3,
-                SEGMENT_NOTE  = 4,
-                SEGMENT_SHLIB = 5,
-                SEGMENT_PHDR  = 6,
+                PT_NULL            = 0,
+                PT_LOAD            = 1,
+                PT_DYNAMIC         = 2,
+                PT_INTERP          = 3,
+                PT_NOTE            = 4,
+                PT_SHLIB           = 5,
+                PT_PHDR            = 6,
+                PT_TLS             = 7,
+                PT_LOOS   = 0x60000000,
+
+                /* You may add your application's OS-specific flags here */
+
+                PT_HIOS   = 0x6fffffff,
+                PT_LOPROC = 0x70000000,
+
+                /* You may add your application's processor-specific flags here */
+
+                PT_HIPROC = 0x7fffffff,
         } ElfSegmentType;
 
+        typedef enum ElfSegmentPerms
+        {
+                PF_X                 = 1,
+                PF_W                 = 2,
+                PF_R                 = 4,
+                PF_MASKOS   = 0x0ff00000,
+
+                /* You may add your application's OS-specific flags here */
+
+                PF_MASKPROC = 0xf0000000,
+
+                /* You may add your application's processor-specific flags here */
+
+        }ElfSegmentPerms;
 
 
         typedef struct
