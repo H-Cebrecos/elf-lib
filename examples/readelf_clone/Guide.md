@@ -43,11 +43,8 @@ File offset
 +--------------------+
 ```
 
-Key idea:
-
-> **ELF separates “how the file is organized” from “how it is loaded”.**
-
-This explains why there are two different header tables.
+The exact layout is not defined, the header indicates where to find each element and the tables further point to the particular structures that they define.
+This means that parsing and elf does not consist of looking into predefined offsets and more closely resembles walking a tree or similar data structures.
 
 ---
 
