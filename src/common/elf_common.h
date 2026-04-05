@@ -25,6 +25,8 @@
 #ifndef ELF_COMM_LIB
 #define ELF_COMM_LIB
 
+#include "elf_core.h"
+
 /** Detect host endianness at runtime */
 static inline EiData host_endianness(void) {
         uint16_t x = 1;

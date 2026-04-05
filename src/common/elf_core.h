@@ -103,7 +103,7 @@ typedef struct
         } ElfABI;
 
         /**
-         * @brief Abtract representation of the ELF header, it does not represent the real layout, instead provides a uniform view into the data.
+         * @brief Abstract representation of the ELF header, it does not represent the real layout, instead provides a uniform view into the data.
          */
         typedef struct
         {

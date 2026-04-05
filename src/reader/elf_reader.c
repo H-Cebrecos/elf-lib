@@ -78,6 +78,25 @@ static inline ElfResult validate_ctx(const ElfCtx *ctx)
 
 ElfResult elf_init(void *user_ctx, elf_read_callback callback, ElfCtx *ctx)
 {
+        /*
+         * This function checks for:
+         *      - Correct Magic         ("ELF")
+         *      - Correct info version  (1)
+         *      - Correct class         (32/64)
+         *      - Correct endiannes     (little/big)
+         *      - Correct hdr version   (1)
+         *      - Correct hdr size
+         *      - Correct phdr size
+         *      - Correct shdr size
+         *      - Zero phdr off with non-zero phdr cnt
+         *      - Zero shdr off with non-zero shdr cnt
+         *      - Hdr has special index but shdr off is zero
+         *      - Hdr has special index but null sec is not of SHT_NULL type
+         * 
+         * This function doesn't check for:
+         *      - null section is not of SHT_NULL type if there is no need to access the section (lazy check)
+         */
+
         ElfResult res = ELF_OK;
         ElfInfo hdr_info;
         uint8_t header_buff[sizeof(Elf64Header)] = {0};
@@ -306,6 +325,19 @@ uint16_t get_program_header_count(const ElfCtx *ctx)
 
 ElfResult get_section_header(const ElfCtx *ctx, uint32_t idx, ElfSecHeader *sec_header)
 {
+        /*
+         * This function checks for:
+         *      - indx is greater than the num of sections or there are no sections
+         *      - size entry validation for REL, RELA and RELR
+         *      - size entry validation for DYNSYM and SYMTAB
+         *      - Compressed sections can't be ALLOC or NOBITS
+         *      - Groups can't appear on relocatable objects
+         * 
+         * This function doesn't check for:
+         *      - group sections appearing before the other sections in the group
+         *      - a SYMTAB_SHNDX is pressent if a symbol tables contains an SHN_XINDEX entry
+         */
+
         ElfResult res = ELF_OK;
         uint8_t sec_head_buff[sizeof(Elf64SecHeader)] = {0};
 
@@ -408,15 +440,13 @@ ElfResult get_section_header(const ElfCtx *ctx, uint32_t idx, ElfSecHeader *sec_
                 if (sec_header->Type == SHT_GROUP && CTX(ctx)->Hdr.Type != ET_REL)
                 {
                         return ELF_BAD_FORMAT;
-                        //NOTE: This implementation does not check that a group section appears before the other sections in the group.
                 }
-                //NOTE: This implementation does not check that a SYMTAB_SHNDX is pressent if a symbol tables contains an SHN_XINDEX entry.
         }
 
         return res;
 }
 
-// internal fuction, does not perform argument checks
+/** internal fuction, does not perform argument checks */
 static ElfResult internal_get_str_from_offset(const ElfCtx *ctx, uint64_t offset, uint8_t *buff, uint16_t len)
 {
         uint16_t i = 0;
@@ -523,7 +553,10 @@ uint32_t get_symbol_count(const ElfCtx *ctx, const ElfSecHeader *sym_tab)
         returning an error would make this fucntion useless as it would require
         more setup than what it is trying to remove. Returning 0 makes the 
         iteration empty and thus isn't a big safety compromise. */
-        if(validate_ctx(ctx) ||(sym_tab == NULL) || (sym_tab->EntrySize == 0))
+        if(validate_ctx(ctx) 
+        ||(sym_tab == NULL) 
+        ||(sym_tab->EntrySize == 0) 
+        ||((sym_tab->Type != SHT_DYNSYM) && (sym_tab->Type != SHT_SYMTAB)))
                 return 0;
         
         return sym_tab->Size/sym_tab->EntrySize;
